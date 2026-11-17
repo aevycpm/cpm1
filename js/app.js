@@ -253,6 +253,7 @@ function cardHTML(s,idx){
     '<button class="pact" data-act="open" data-id="'+id+'">'+PI.cmt+'<span>Review</span></button>'+
     '<button class="pact" data-act="copy" data-id="'+id+'">'+PI.copy+'<span>Copy</span></button>'+
     '<button class="pact" data-act="dl" data-id="'+id+'">'+PI.dl+'<span>Download</span></button>'+
+    (window.AevySaved?AevySaved.btn(s.id):'')+
    '</div></article>';
 }
 document.addEventListener('click',function(e){
@@ -265,6 +266,7 @@ document.addEventListener('click',function(e){
     if(act==='copy')copyScript(s);
     if(act==='open')openScript(s.id);
     if(act==='like'&&window.AevyStats)AevyStats.like(s,a);
+    if(act==='save'&&window.AevySaved)AevySaved.toggle(s);
     if(act==='del')deleteScript(s);
     return;
   }

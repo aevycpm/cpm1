@@ -739,3 +739,55 @@ create policy avatars_update on storage.objects for update to authenticated
   with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text);
 create policy avatars_delete on storage.objects for delete to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text);
+
+
+-- ---------- Saved scripts (private bookmarks) and pinned scripts (up to 3 on your profile) ----------
+create table if not exists public.script_saves (
+  script_id uuid not null references public.scripts(id) on delete cascade,
+  owner     uuid not null references public.profiles(id) on delete cascade,
+  created   timestamptz not null default now(),
+  primary key (script_id, owner)
+);
+create index if not exists script_saves_owner_idx on public.script_saves (owner, created desc);
+
+create table if not exists public.script_pins (
+  script_id uuid not null references public.scripts(id) on delete cascade,
+  owner     uuid not null references public.profiles(id) on delete cascade,
+  created   timestamptz not null default now(),
+  primary key (script_id, owner)
+);
+create index if not exists script_pins_owner_idx on public.script_pins (owner, created);
+
+create or replace function public.pins_limit() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if (select count(*) from public.script_pins where owner = new.owner) >= 3 then
+    raise exception 'You can pin up to 3 scripts. Unpin one first.';
+  end if;
+  return new;
+end $$;
+drop trigger if exists pins_limit on public.script_pins;
+create trigger pins_limit before insert on public.script_pins for each row execute function public.pins_limit();
+
+alter table public.script_saves enable row level security;
+alter table public.script_pins  enable row level security;
+
+drop policy if exists saves_read   on public.script_saves;
+drop policy if exists saves_insert on public.script_saves;
+drop policy if exists saves_delete on public.script_saves;
+create policy saves_read   on public.script_saves for select to authenticated using (owner = (select auth.uid()));
+create policy saves_insert on public.script_saves for insert to authenticated
+  with check (owner = (select auth.uid()) and exists (select 1 from public.scripts s where s.id = script_id));
+create policy saves_delete on public.script_saves for delete to authenticated using (owner = (select auth.uid()));
+
+drop policy if exists pins_read   on public.script_pins;
+drop policy if exists pins_insert on public.script_pins;
+drop policy if exists pins_delete on public.script_pins;
+create policy pins_read   on public.script_pins for select using (exists (select 1 from public.scripts s where s.id = script_id));
+create policy pins_insert on public.script_pins for insert to authenticated
+  with check (owner = (select auth.uid()) and exists (select 1 from public.scripts s where s.id = script_id and s.owner = (select auth.uid())));
+create policy pins_delete on public.script_pins for delete to authenticated using (owner = (select auth.uid()));
+
+grant select, insert, delete on public.script_saves to authenticated;
+grant select on public.script_pins to anon;
+grant select, insert, delete on public.script_pins to authenticated;

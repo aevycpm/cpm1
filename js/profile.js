@@ -6,7 +6,7 @@
 var C=window.AevyCore,A=window.AevyAuth;
 if(!C||!A)return;
 var esc=C.esc,$=function(s,r){return (r||document).querySelector(s)},$$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
-var ctx=null,tab='scripts',lastUid='';
+var ctx=null,tab='scripts',lastUid='',lay=(function(){try{return localStorage.getItem('aevy.lay')==='grid'?'grid':'list'}catch(e){return 'list'}})();
 function safeImg(u){return /^https:\/\//i.test(u||'')?u:''}
 function av(u,n){return window.AevyEco?AevyEco.avatar(u,n):''}
 function badge(u,big){return window.AevyBadge?AevyBadge.html(u,big):''}
@@ -30,14 +30,17 @@ function header(u,own,list){
   var t=totals(list),cv=safeImg(u.cover);
   var rating=t.rc?(t.rs/t.rc).toFixed(1):'-';
   var tabs=[['scripts','Scripts',list.length],['posts','Posts'],['about','About']];
+  if(own)tabs.push(['saved','Saved']);
   if(own)tabs.push(['settings','Settings']);
-  return '<div class="pp-card"><div class="pp-cover'+(cv?' has':'')+'" style="--c:'+esc(u.color)+(cv?';background-image:url(\''+esc(cv)+'\')':'')+'">'+
-    (own?'<div class="pp-cbtns"><button type="button" class="btn btn-sm" data-img="cover">'+IC.cam+(cv?'Change cover':'Add cover')+'</button>'+(cv?'<button type="button" class="btn btn-sm" data-rm="cover">Remove</button>':'')+'</div>':'')+'</div>'+
-    '<div class="pp-head"><div class="pp-av">'+av(u,128)+(own?'<button type="button" class="pf-cam" data-img="avatar" aria-label="Change profile photo" title="Change profile photo">'+IC.cam+'</button>':'')+'</div>'+
-    '<div class="pf-main" data-uid="'+esc(u.id)+'"><div class="pf-row"><div class="pp-id"><h1>'+esc(u.name)+badge(u,true)+'</h1><p class="pf-un">@'+esc(u.username)+'</p></div>'+
-    '<div class="pf-acts">'+(own?'<button type="button" class="btn btn-primary btn-sm" data-pp="edit">Edit profile</button>':'')+'<button type="button" class="btn btn-sm" data-pp="share">'+IC.share+'Share</button></div></div>'+
-    '<ul class="pf-stats"><li><b>'+n0(list.length)+'</b><span>Scripts</span></li><li><b>'+n0(t.dl)+'</b><span>Downloads</span></li><li><b>'+n0(t.likes)+'</b><span>Likes</span></li><li><b>'+rating+'</b><span>Rating</span></li></ul></div></div>'+
-    '<nav class="pp-tabs" role="tablist" aria-label="Profile sections">'+tabs.map(function(x){return '<button type="button" role="tab" data-ptab="'+x[0]+'" class="'+(x[0]===tab?'on':'')+'" aria-selected="'+(x[0]===tab)+'">'+x[1]+(x[2]!=null?'<small>'+x[2]+'</small>':'')+'</button>'}).join('')+'</nav></div>';
+  var web=u.website?'<a class="ig-web" href="'+esc(u.website)+'" target="_blank" rel="noopener noreferrer nofollow">'+esc(u.website.replace(/^https?:\/\/(www\.)?/i,'').replace(/\/$/,''))+'</a>':'';
+  return '<div class="pp-card ig"><div class="pp-cover'+(cv?' has':'')+'" style="--c:'+esc(u.color)+(cv?';background-image:url(\''+esc(cv)+'\')':'')+'"></div>'+
+    '<div class="pp-head ig-head"><div class="pp-av ig-av"><span class="ig-ring">'+av(u,150)+'</span>'+(own?'<button type="button" class="pf-cam" data-img="avatar" aria-label="Change profile photo" title="Change profile photo">'+IC.cam+'</button>':'')+'</div>'+
+    '<div class="pf-main" data-uid="'+esc(u.id)+'"><div class="pf-row"><div class="pp-id"><h1>'+esc(u.username)+'</h1><p class="pf-un">'+esc(u.name)+badge(u,true)+'</p></div>'+
+    '<div class="pf-acts">'+(own?'<button type="button" class="btn btn-sm" data-pp="edit">Edit profile</button>':'')+'<button type="button" class="btn btn-sm" data-pp="share">'+IC.share+'Share</button></div></div>'+
+    '<ul class="pf-stats"><li><b>'+n0(list.length)+'</b><span>scripts</span></li></ul>'+
+    '<div class="ig-bio"><strong class="ig-name">'+esc(u.name)+'</strong>'+(u.bio?'<p>'+esc(u.bio)+'</p>':'')+(u.location?'<p class="ig-loc">'+IC.pin+esc(u.location)+'</p>':'')+web+
+    '<p class="ig-sub">'+n0(t.dl)+' downloads &middot; '+n0(t.likes)+' likes &middot; '+rating+' &#9733;</p></div></div></div>'+
+    '<nav class="pp-tabs ig-tabs" role="tablist" aria-label="Profile sections">'+tabs.map(function(x){return '<button type="button" role="tab" data-ptab="'+x[0]+'" class="'+(x[0]===tab?'on':'')+'" aria-selected="'+(x[0]===tab)+'">'+x[1]+(x[2]!=null?'<small>'+x[2]+'</small>':'')+'</button>'}).join('')+'</nav></div>';
 }
 function aboutCard(u,own){
   var meta='';
@@ -60,13 +63,37 @@ function completeCard(u){
 
 function scriptsPane(){
   var u=ctx.u,own=ctx.own,list=ctx.list,lg=own?C.localCount():0;
-  return '<div class="pp-tools">'+(list.length>4?'<input class="field" id="ppSearch" type="search" placeholder="Search scripts" aria-label="Search scripts">':'<span></span>')+(own?'<a class="btn btn-primary btn-sm" href="#/publish">Publish script</a>':'')+'</div>'+
+  return '<div class="pp-tools">'+(list.length>4?'<input class="field" id="ppSearch" type="search" placeholder="Search scripts" aria-label="Search scripts">':'<span></span>')+'<span class="pp-view" role="group" aria-label="Layout"><button type="button" data-lay="list" class="'+(lay==='list'?'on':'')+'" aria-label="List view" title="List">'+ic('<path d="M4 6h16M4 12h16M4 18h16"/>')+'</button><button type="button" data-lay="grid" class="'+(lay==='grid'?'on':'')+'" aria-label="Grid view" title="Grid">'+ic('<rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/>')+'</button></span>'+(own?'<a class="btn btn-primary btn-sm" href="#/publish">Publish script</a>':'')+'</div>'+
    (lg?'<div class="notice">'+lg+' script'+(lg===1?'':'s')+' found in this browser from the old local version. <button class="btn" id="claim">Upload '+(lg===1?'it':'them')+' to your account</button></div>':'')+
-   '<div class="feed-list" id="ppCards">'+cards(list,own)+'</div>';
+   '<div class="feed-list'+(lay==='grid'?' pp-grid':'')+'" id="ppCards">'+cards(list,own)+'</div>';
 }
 function cards(list,own){
   return list.length?list.map(C.cardHTML).join(''):'<div class="empty"><h3>'+(own?'Nothing published yet':'No public scripts yet')+'</h3><p>'+(own?'Your scripts appear here. Only you can edit or delete them.':'Check back later.')+'</p>'+(own?'<a class="btn btn-primary" href="#/publish">Publish your first script</a>':'')+'</div>';
 }
+function savedPane(){
+  var l=window.AevySaved?AevySaved.list():[];
+  return '<div class="feed-list'+(lay==='grid'?' pp-grid':'')+'">'+(l.length?l.map(C.cardHTML).join(''):'<div class="empty"><h3>Nothing saved yet</h3><p>Tap Save on any script and it appears here. Only you can see this tab.</p><a class="btn btn-primary" href="#/scripts">Browse scripts</a></div>')+'</div>';
+}
+function decorate(){
+  if(!ctx||!window.AevyPins)return;
+  var ids=AevyPins.ids(ctx.u.id);
+  $$('#ppCards .card[data-open]').forEach(function(c){
+    var old=c.querySelector('.pin-ctl');if(old)old.remove();
+    var id=c.dataset.open,on=ids.indexOf(id)>-1,h=c.querySelector('.post-head'),v=c.querySelector('.vtag');
+    c.classList.toggle('is-pinned',on);
+    if(!h||(!on&&!ctx.own))return;
+    var el=document.createElement('span');el.className='pin-ctl';
+    el.innerHTML=(on?'<span class="pin-tag">Pinned</span>':'')+(ctx.own?'<button type="button" class="pin-btn" data-pin="'+esc(id)+'">'+(on?'Unpin':'Pin')+'</button>':'');
+    h.insertBefore(el,v||null);
+  });
+}
+function applyPins(){
+  if(!ctx||!window.AevyPins)return;
+  ctx.list=AevyPins.sort(ctx.list,ctx.u.id);
+  if(tab==='scripts'&&$('#ppPane'))paintPane();
+}
+window.addEventListener('aevy:pins',function(){if(ctx&&ctx.own)applyPins()});
+window.addEventListener('aevy:saved',function(){if(tab==='saved'&&ctx&&ctx.own&&$('#ppPane'))paintPane()});
 function postsPane(){return '<div class="feed-list" id="ppPosts"><div class="empty">Loading...</div></div>'}
 function aboutPane(){
   var u=ctx.u;
@@ -85,12 +112,13 @@ function paintPane(){
   $$('.pp-tabs [data-ptab]').forEach(function(b){var on=b.dataset.ptab===tab;b.classList.toggle('on',on);b.setAttribute('aria-selected',on)});
   if(tab==='posts'){pane.innerHTML=postsPane();if(window.AevyCommunity&&AevyCommunity.mountPosts)AevyCommunity.mountPosts($('#ppPosts'),ctx.u.id)}
   else if(tab==='about')pane.innerHTML=aboutPane();
+  else if(tab==='saved'&&ctx.own)pane.innerHTML=savedPane();
   else if(tab==='settings'&&ctx.own){pane.innerHTML=settingsPane();wireSettings()}
-  else{tab='scripts';pane.innerHTML=scriptsPane();wireScripts()}
+  else{tab='scripts';pane.innerHTML=scriptsPane();wireScripts();decorate()}
 }
 function wireScripts(){
   var s=$('#ppSearch');
-  if(s)s.oninput=function(){var q=this.value.trim().toLowerCase();$('#ppCards').innerHTML=cards(ctx.list.filter(function(x){return !q||(x.title+' '+(x.desc||'')+' '+(x.tags||[]).join(' ')).toLowerCase().indexOf(q)>-1}),ctx.own)};
+  if(s)s.oninput=function(){var q=this.value.trim().toLowerCase();$('#ppCards').innerHTML=cards(ctx.list.filter(function(x){return !q||(x.title+' '+(x.desc||'')+' '+(x.tags||[]).join(' ')).toLowerCase().indexOf(q)>-1}),ctx.own);decorate()};
   var c=$('#claim');
   if(c)c.onclick=function(){var b=this;b.disabled=true;b.textContent='Uploading...';C.importLocal().then(function(n){C.toast(n+' script(s) uploaded');window.dispatchEvent(new Event('aevy:auth'))},function(x){b.disabled=false;C.toast(x.message)})};
 }
@@ -126,6 +154,8 @@ function openEdit(){
 dlg.addEventListener('click',function(e){var b=e.target.closest('[data-img]');if(b&&window.AevyEco&&AevyEco.pick){dlg.close();AevyEco.pick(b.dataset.img)}});
 
 document.addEventListener('click',function(e){
+  var lb=e.target.closest('[data-lay]');
+  if(lb&&lb.closest('.pp')){lay=lb.dataset.lay;try{localStorage.setItem('aevy.lay',lay)}catch(x){}paintPane();return}
   var t=e.target.closest('[data-ptab]');
   if(t&&t.closest('.pp')){tab=t.dataset.ptab;paintPane();return}
   var a=e.target.closest('[data-pp]');
@@ -133,6 +163,7 @@ document.addEventListener('click',function(e){
   if(a.dataset.pp==='edit')openEdit();
   if(a.dataset.pp==='share'&&ctx){
     var url=location.origin+location.pathname+'#/u/'+ctx.u.username;
+    if(navigator.share){navigator.share({title:ctx.u.name+' (@'+ctx.u.username+') on Aevy',text:'Check out '+ctx.u.name+' on Aevy',url:url}).catch(function(){});return}
     (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(url):Promise.reject()).then(function(){C.toast('Profile link copied')},function(){window.prompt('Copy this link',url)});
   }
 });
@@ -144,6 +175,7 @@ function render(sel,u,own){
   ctx={u:u,own:own,list:list};
   box.innerHTML='<div class="wrap pp">'+header(u,own,list)+'<div class="pp-body"><aside class="pp-side">'+aboutCard(u,own)+'</aside><section class="pp-pane" id="ppPane"></section></div></div>';
   paintPane();
+  if(window.AevyPins){var uid=u.id;AevyPins.load(uid).then(function(){if(ctx&&ctx.u.id===uid)applyPins()})}
 }
 window.AevyProfile={render:render};
 })();

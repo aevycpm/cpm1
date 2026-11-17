@@ -70,11 +70,12 @@ function toggleFollow(id,btn){
     var box=$('.pf-main[data-uid="'+id+'"]');if(box)refreshCounts(box);
   },function(e){btn.disabled=false;fail(e)});
 }
+function compact(n){n=n||0;if(n>=1e6)return (n/1e6).toFixed(n>=1e7?0:1).replace(/\.0$/,'')+'M';if(n>=1e4)return (n/1e3).toFixed(n>=1e5?0:1).replace(/\.0$/,'')+'K';return n.toLocaleString()}
 function refreshCounts(box){
   var id=box.dataset.uid;
   counts(id).then(function(c){
     var f=$('[data-cnt="followers"] b',box),g=$('[data-cnt="following"] b',box);
-    if(f)f.textContent=c[0].toLocaleString();if(g)g.textContent=c[1].toLocaleString();
+    if(f){f.textContent=compact(c[0]);f.title=c[0].toLocaleString()}if(g){g.textContent=compact(c[1]);g.title=c[1].toLocaleString()}
   });
 }
 function listPeople(box,kind){
@@ -103,8 +104,11 @@ function injectProfile(box){
   var acts=$('.pf-acts',box);
   if(acts&&!own&&u)acts.insertAdjacentHTML('afterbegin',followBtn(id)+'<a class="btn btn-sm" href="#/messages/'+esc(u.username)+'" data-msg="'+esc(u.username)+'">Message</a>');
   var st=$('.pf-stats',box);
-  if(st)st.insertAdjacentHTML('beforeend','<li data-cnt="followers"><button type="button" class="linkish" data-list="followers"><b>-</b> <span>Followers</span></button></li><li data-cnt="following"><button type="button" class="linkish" data-list="following"><b>-</b> <span>Following</span></button></li>');
+  if(st)st.insertAdjacentHTML('beforeend','<li data-cnt="followers"><button type="button" class="linkish" data-list="followers"><b>-</b> <span>followers</span></button></li><li data-cnt="following"><button type="button" class="linkish" data-list="following"><b>-</b> <span>following</span></button></li>');
   refreshCounts(box);
+  if(me()&&!own&&un)SB.from('follows').select('follower').eq('follower',id).eq('following',me().id).limit(1).then(function(r){
+    if(!r.error&&r.data&&r.data.length&&!$('.fyou',box))un.insertAdjacentHTML('beforeend',' <span class="fyou">Follows you</span>');
+  },function(){});
   var av0=$('.pf-av .avatar',box);
   pollOnline([id]);
 }
@@ -174,6 +178,11 @@ function dayLabel(t){
 }
 function rich(s){return esc(s).replace(/(https?:\/\/[^\s<]*[^\s<.,;:!?)\]'"])/g,function(u){return '<a href="'+u+'" target="_blank" rel="noopener noreferrer nofollow">'+u+'</a>'})}
 function mobile(){return window.innerWidth<=760}
+/* keep the chat exactly as tall as the visible screen (phone keyboards shrink it) */
+(function(){var vv=window.visualViewport;
+  function fit(){var h=vv?vv.height:window.innerHeight;document.documentElement.style.setProperty('--vvh',Math.round(h)+'px');if(document.querySelector('#view-messages.active')&&window.scrollY)window.scrollTo(0,0)}
+  if(vv){vv.addEventListener('resize',fit);vv.addEventListener('scroll',fit)}window.addEventListener('resize',fit);fit();
+})();
 function first(u){return String(u.name||u.username).split(/\s+/)[0]}
 function preview(m){return (m.s===me().id?'You: ':'')+String(m.body).replace(/\s+/g,' ').slice(0,70)}
 
@@ -251,7 +260,7 @@ function shell(u,kind){
    '<a class="cw-who" href="#/u/'+esc(u.username)+'"><span class="avw">'+av(u,d?34:42)+'</span><span class="cw-t"><b>'+esc(u.name)+badge(u)+'</b><small class="pres" data-uid="'+esc(u.id)+'"></small></span></a>'+
    '<span class="cw-tools">'+(d?'<i class="ci-n cw-n" hidden></i><button type="button" class="cw-ibtn" data-cw="min" title="Minimise" aria-label="Minimise">'+ico(P.min,17)+'</button><a class="cw-ibtn" data-cw="full" href="#/messages/'+esc(u.username)+'" title="Open in Messages" aria-label="Open in Messages">'+ico(P.full,16)+'</a><button type="button" class="cw-ibtn" data-cw="close" title="Close" aria-label="Close">'+ico(P.close,17)+'</button>':'<a class="cw-ibtn" href="#/u/'+esc(u.username)+'" title="View profile" aria-label="View profile">'+ico(P.user,18)+'</a>')+'</span></header>'+
    '<div class="cw-body" data-body tabindex="-1"></div><div class="cw-typing" data-typing aria-live="polite"></div>'+
-   '<div class="cw-compose"><textarea class="cw-input" rows="1" maxlength="2000" placeholder="Message '+esc(first(u))+'" aria-label="Write a message"></textarea><button type="button" class="cw-send" data-send disabled aria-label="Send message">'+ico(P.send,18)+'</button></div>';
+   '<div class="cw-compose"><button type="button" class="cw-emo" data-emo aria-label="Add emoji" title="Emoji">&#128578;</button><textarea class="cw-input" rows="1" maxlength="2000" placeholder="Message '+esc(first(u))+'" aria-label="Write a message"></textarea><button type="button" class="cw-send" data-send disabled aria-label="Send message">Send</button></div>';
 }
 function makeThread(el,u,kind){
   var t={el:el,u:u,kind:kind};
@@ -557,4 +566,29 @@ var pend;
 new MutationObserver(function(){
   clearTimeout(pend);pend=setTimeout(function(){$$('.pf-main[data-uid]').forEach(injectProfile);paint()},120);
 }).observe(document.body,{childList:true,subtree:true});
+})();
+
+/* emoji picker for the message box */
+(function(){
+  var E=['😀','😂','🥹','😍','😎','🤔','😭','😡','👍','👎','👏','🙏','🔥','💯','❤️','💔','🎉','✨','🚗','🏁','🔧','⚙️','📦','✅','❌','👀','🙌','🤝'];
+  var pick=null;
+  function close(){if(pick){pick.remove();pick=null}}
+  document.addEventListener('click',function(e){
+    var b=e.target.closest('[data-emo]');
+    if(b){
+      var same=pick&&pick._b===b;close();if(same)return;
+      pick=document.createElement('div');pick.className='emo-pop';pick._b=b;
+      pick.innerHTML=E.map(function(x){return '<button type="button" data-e="'+x+'">'+x+'</button>'}).join('');
+      b.parentNode.appendChild(pick);return;
+    }
+    var o=e.target.closest('.emo-pop [data-e]');
+    if(o){
+      var ta=o.closest('.cw-compose').querySelector('.cw-input'),st=ta.selectionStart==null?ta.value.length:ta.selectionStart;
+      ta.value=ta.value.slice(0,st)+o.dataset.e+ta.value.slice(ta.selectionEnd==null?st:ta.selectionEnd);
+      ta.focus();var p=st+o.dataset.e.length;try{ta.setSelectionRange(p,p)}catch(x){}
+      ta.dispatchEvent(new Event('input'));return;
+    }
+    if(!e.target.closest('.emo-pop'))close();
+  });
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')close()});
 })();

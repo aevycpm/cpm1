@@ -84,11 +84,9 @@ function rightCol(){
 function render(){
   var root=$('#homeRoot');if(!root)return;
   root.classList.toggle('guest',!me());
-  root.innerHTML=(me()?'<aside class="hs-left">'+leftCard()+nav()+'</aside>':'')+
-   '<main class="hs-mid">'+composer()+
+  root.innerHTML='<main class="hs-mid">'+composer()+
    '<div class="hs-tabs" id="homeTabs" role="tablist"><button type="button" data-tab="latest" role="tab">Latest</button><button type="button" data-tab="trending" role="tab">Trending</button><button type="button" data-tab="following" role="tab">Following</button></div>'+
-   '<div class="feed-list" id="homeFeed"></div></main>'+
-   '<aside class="hs-right">'+rightCol()+'</aside>';
+   '<div class="feed-list" id="homeFeed"></div></main>';
   paintFeed();
   if(me()&&S())S().counts(me().id).then(function(c){var a=$('#hsFollowers'),b=$('#hsFollowing');if(a)a.textContent=c[0];if(b)b.textContent=c[1]});
 }

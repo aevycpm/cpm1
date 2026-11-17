@@ -1,0 +1,8 @@
+{
+  "appId": "com.aevy.app",
+  "appName": "Aevy",
+  "webDir": "www",
+  "backgroundColor": "#0a0b0d",
+  "server": { "androidScheme": "https" },
+  "android": { "allowMixedContent": false }
+}

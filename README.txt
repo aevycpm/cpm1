@@ -197,3 +197,13 @@ members. Each one has a Download button, a title that opens the script page, and
 - Nothing downloads by itself: the visitor must press Download (downloads are counted as usual).
 - Shown once per browser (localStorage key aevy.discover.v1). Never shows private scripts or the visitor's own scripts.
 - Turn off: set  discover: false  in js/config.js.  Code: js/discover.js
+
+
+Saved + Pinned scripts, profile extras (new)
+--------------------------------------------
+- Save        every script card has a Save button (private bookmark). Your own profile has a "Saved" tab. Guests are sent to sign in.
+- Pin         on your own profile each script card has Pin / Unpin; up to 3 pinned scripts show first with a "Pinned" tag (enforced in the database).
+- Profile     Instagram-style header, grid/list toggle, "Follows you" tag, native Share on phones.
+- Chat        Instagram-style bubbles, emoji picker, phone-safe full-screen layout.
+- Home        scripts and posts only. Signed-out visitors also see the "Follow Aevy" prompt and "Suggested accounts" strip (js/suggest.js, switch off with suggest:false in js/config.js).
+Run the new supabase/schema.sql again: it adds script_saves and script_pins with Row Level Security (safe to re-run).
