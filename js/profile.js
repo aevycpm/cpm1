@@ -37,7 +37,7 @@ function header(u,own,list){
     '<div class="pp-head ig-head"><div class="pp-av ig-av"><span class="ig-ring">'+av(u,150)+'</span>'+(own?'<button type="button" class="pf-cam" data-img="avatar" aria-label="Change profile photo" title="Change profile photo">'+IC.cam+'</button>':'')+'</div>'+
     '<div class="pf-main" data-uid="'+esc(u.id)+'"><div class="pf-row"><div class="pp-id"><h1>'+esc(u.username)+'</h1><p class="pf-un">'+esc(u.name)+badge(u,true)+'</p></div>'+
     '<div class="pf-acts">'+(own?'<button type="button" class="btn btn-sm" data-pp="edit">Edit profile</button>':'')+'<button type="button" class="btn btn-sm" data-pp="share">'+IC.share+'Share</button></div></div>'+
-    '<ul class="pf-stats"><li><b>'+n0(list.length)+'</b><span>scripts</span></li></ul>'+
+    '<ul class="pf-stats"><li><b>'+n0(list.length)+'</b><span>'+(list.length===1?'script':'scripts')+'</span></li></ul>'+
     '<div class="ig-bio"><strong class="ig-name">'+esc(u.name)+'</strong>'+(u.bio?'<p>'+esc(u.bio)+'</p>':'')+(u.location?'<p class="ig-loc">'+IC.pin+esc(u.location)+'</p>':'')+web+
     '<p class="ig-sub">'+n0(t.dl)+' downloads &middot; '+n0(t.likes)+' likes &middot; '+rating+' &#9733;</p></div></div></div>'+
     '<nav class="pp-tabs ig-tabs" role="tablist" aria-label="Profile sections">'+tabs.map(function(x){return '<button type="button" role="tab" data-ptab="'+x[0]+'" class="'+(x[0]===tab?'on':'')+'" aria-selected="'+(x[0]===tab)+'">'+x[1]+(x[2]!=null?'<small>'+x[2]+'</small>':'')+'</button>'}).join('')+'</nav></div>';

@@ -1843,3 +1843,20 @@ body::after {
 .pwa-card div { flex: 1; min-width: 0; display: grid; gap: 1px; }
 .pwa-card small { color: var(--muted); font-size: 12.5px; line-height: 1.3; }
 .pwa-x { position: absolute; top: 4px; right: 8px; background: none; border: 0; color: var(--muted); font-size: 20px; cursor: pointer; }
+
+/* five actions in one row (Like, Review, Copy, Download, Save) */
+.card .post-acts { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.card .post-acts .pact { min-width: 0; padding-inline: 4px; justify-content: center; }
+@media (max-width: 700px) { .card .post-acts .pact span { display: none; } }
+
+/* ===== Messages on phones, v2: measured height, no fixed positioning, no heavy effects ===== */
+#view-messages.active { animation: none; }
+.cb.me .cb-in { background-attachment: scroll; }
+.cw-body { scroll-behavior: auto; }
+@media (max-width: 760px) {
+  .mx { position: relative !important; top: auto !important; left: auto !important; right: auto !important; z-index: auto !important; height: var(--mxh, calc(100dvh - 110px)) !important; max-height: none !important; width: 100% !important; contain: layout paint; }
+  body:has(#view-messages.active) .site-header { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--bg); }
+  body:has(#view-messages.active)::before { display: none; }
+  .cw-body, .mx-list { transform: translateZ(0); }
+  .cb-in { will-change: auto; }
+}

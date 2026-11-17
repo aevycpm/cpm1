@@ -75,7 +75,7 @@ function refreshCounts(box){
   var id=box.dataset.uid;
   counts(id).then(function(c){
     var f=$('[data-cnt="followers"] b',box),g=$('[data-cnt="following"] b',box);
-    if(f){f.textContent=compact(c[0]);f.title=c[0].toLocaleString()}if(g){g.textContent=compact(c[1]);g.title=c[1].toLocaleString()}
+    if(f){f.textContent=compact(c[0]);f.title=c[0].toLocaleString();var fl=f.parentNode.querySelector('span');if(fl)fl.textContent=c[0]===1?'follower':'followers'}if(g){g.textContent=compact(c[1]);g.title=c[1].toLocaleString()}
   });
 }
 function listPeople(box,kind){
@@ -178,10 +178,22 @@ function dayLabel(t){
 }
 function rich(s){return esc(s).replace(/(https?:\/\/[^\s<]*[^\s<.,;:!?)\]'"])/g,function(u){return '<a href="'+u+'" target="_blank" rel="noopener noreferrer nofollow">'+u+'</a>'})}
 function mobile(){return window.innerWidth<=760}
-/* keep the chat exactly as tall as the visible screen (phone keyboards shrink it) */
-(function(){var vv=window.visualViewport;
-  function fit(){var h=vv?vv.height:window.innerHeight;document.documentElement.style.setProperty('--vvh',Math.round(h)+'px');if(document.querySelector('#view-messages.active')&&window.scrollY)window.scrollTo(0,0)}
-  if(vv){vv.addEventListener('resize',fit);vv.addEventListener('scroll',fit)}window.addEventListener('resize',fit);fit();
+/* keep the chat exactly as tall as the visible screen: measures where the chat starts and what is really visible
+   (phone address bars and keyboards change the visible height) */
+(function(){var vv=window.visualViewport,raf=0,root=document.documentElement;
+  function fit(){cancelAnimationFrame(raf);raf=requestAnimationFrame(function(){
+    var h=vv?vv.height:window.innerHeight,v=document.querySelector('#view-messages.active'),m=document.getElementById('msgs');
+    root.style.setProperty('--vvh',Math.round(h)+'px');
+    if(!v||!m||window.innerWidth>760){root.style.removeProperty('--mxh');return}
+    if(window.scrollY)window.scrollTo(0,0);
+    var top=m.getBoundingClientRect().top-(vv?vv.offsetTop:0);
+    root.style.setProperty('--mxh',Math.max(260,Math.floor(h-top))+'px');
+  })}
+  if(vv){vv.addEventListener('resize',fit);vv.addEventListener('scroll',fit)}
+  window.addEventListener('resize',fit);window.addEventListener('orientationchange',fit);window.addEventListener('hashchange',function(){fit();setTimeout(fit,120);setTimeout(fit,500)});
+  document.addEventListener('focusin',function(e){if(e.target.closest&&e.target.closest('#msgs')){fit();setTimeout(fit,250);setTimeout(fit,600)}});
+  var mn=document.querySelector('main');if(mn)new MutationObserver(fit).observe(mn,{attributes:true,subtree:true,attributeFilter:['class']});
+  fit();
 })();
 function first(u){return String(u.name||u.username).split(/\s+/)[0]}
 function preview(m){return (m.s===me().id?'You: ':'')+String(m.body).replace(/\s+/g,' ').slice(0,70)}
