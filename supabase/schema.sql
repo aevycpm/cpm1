@@ -148,8 +148,8 @@ drop trigger if exists profiles_guard on public.profiles;
 create trigger profiles_guard before insert or update on public.profiles
   for each row execute function public.profiles_guard();
 
--- Email and phone sign-ups pass username + name as user metadata; the profile is created here so it works
--- even before the email link / SMS code is confirmed (no session yet).
+-- Email sign-ups pass username + name as user metadata; the profile is created here so it works
+-- even before the email link is confirmed (no session yet).
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare
@@ -791,3 +791,25 @@ create policy pins_delete on public.script_pins for delete to authenticated usin
 grant select, insert, delete on public.script_saves to authenticated;
 grant select on public.script_pins to anon;
 grant select, insert, delete on public.script_pins to authenticated;
+
+-- ---------- Reports (Report button on scripts and profiles) ----------
+-- Signed-in users can report a script or a profile. Only you (Admin) can read them: Supabase > Table Editor > reports.
+create table if not exists public.reports (
+  id       uuid primary key default gen_random_uuid(),
+  reporter uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  kind     text not null check (kind in ('script','profile')),
+  target   uuid not null,
+  reason   text not null check (reason in ('malware','spam','impersonation','harassment','copyright','other')),
+  details  text not null default '' check (char_length(details) <= 500),
+  status   text not null default 'open' check (status in ('open','reviewed','dismissed')),
+  created  timestamptz not null default now(),
+  unique (reporter, kind, target)
+);
+alter table public.reports enable row level security;
+drop policy if exists reports_insert on public.reports;
+drop policy if exists reports_read   on public.reports;
+drop policy if exists reports_admin  on public.reports;
+create policy reports_insert on public.reports for insert to authenticated with check (reporter = (select auth.uid()));
+create policy reports_read   on public.reports for select to authenticated using (reporter = (select auth.uid()) or public.is_admin());
+create policy reports_admin  on public.reports for update to authenticated using (public.is_admin()) with check (public.is_admin());
+grant select, insert, update on public.reports to authenticated;

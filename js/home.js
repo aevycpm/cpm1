@@ -81,12 +81,27 @@ function rightCol(){
    '<div class="hs-card"><h3>Who to follow</h3><div id="homeSuggest">'+suggestHTML()+'</div></div>'+
    '<div class="hs-card"><h3>Online now</h3><div class="hs-onl" id="homeOnline">'+onlineHTML()+'</div></div>';
 }
+function stories(){
+  var m=me(),ids=S()?S().onlineIds():[],on={};ids.forEach(function(i){on[i]=1});
+  var count={};C.vis().forEach(function(s){count[s.owner]=(count[s.owner]||0)+1});
+  var us=A.all().filter(function(u){return !m||u.id!==m.id}).sort(function(a,b){return (on[b.id]?1:0)-(on[a.id]?1:0)||(count[b.id]||0)-(count[a.id]||0)}).slice(0,14);
+  var mine='<a class="st" href="'+(m?'#/publish':'#/auth')+'"><span class="st-av me">'+(m?av(m,58):'<span class="avatar" style="width:58px;height:58px">A</span>')+'<i>+</i></span><small>'+(m?'Your script':'Sign in')+'</small></a>';
+  return '<div class="stories" aria-label="People">'+mine+us.map(function(u){
+    return '<a class="st" href="#/u/'+esc(u.username)+'"><span class="st-av'+(on[u.id]?' live':(count[u.id]?' ring':''))+'">'+av(u,58)+'</span><small>'+esc(u.username)+'</small></a>';
+  }).join('')+'</div>';
+}
+function meChip(){
+  var m=me();if(!m)return '<div class="ig-me"><span class="avatar" style="width:44px;height:44px">A</span><div><b>Join Aevy</b><small>Sign in to follow creators</small></div><a href="#/auth">Sign in</a></div>';
+  return '<div class="ig-me">'+av(m,44)+'<div><a href="#/profile"><b>'+esc(m.username)+'</b></a><small>'+esc(m.name)+'</small></div></div>';
+}
 function render(){
   var root=$('#homeRoot');if(!root)return;
   root.classList.toggle('guest',!me());
-  root.innerHTML='<main class="hs-mid">'+composer()+
+  root.innerHTML='<main class="hs-mid">'+stories()+composer()+
    '<div class="hs-tabs" id="homeTabs" role="tablist"><button type="button" data-tab="latest" role="tab">Latest</button><button type="button" data-tab="trending" role="tab">Trending</button><button type="button" data-tab="following" role="tab">Following</button></div>'+
-   '<div class="feed-list" id="homeFeed"></div></main>';
+   '<div class="feed-list" id="homeFeed"></div></main>'+
+   '<aside class="hs-right ig-right">'+meChip()+'<div class="hs-card"><h3>Suggested for you</h3><div id="homeSuggest">'+suggestHTML()+'</div></div>'+
+   '<p class="ig-foot"><a href="#/about">About</a><a href="#/privacy">Privacy</a><a href="#/terms">Terms</a><a href="#/guidelines">Guidelines</a><a href="#/contact">Contact</a><span>&copy; 2026 Aevy</span></p></aside>';
   paintFeed();
   if(me()&&S())S().counts(me().id).then(function(c){var a=$('#hsFollowers'),b=$('#hsFollowing');if(a)a.textContent=c[0];if(b)b.textContent=c[1]});
 }

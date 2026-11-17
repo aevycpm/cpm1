@@ -6,7 +6,7 @@
 var C=window.AevyCore,A=window.AevyAuth;
 if(!C||!A)return;
 var esc=C.esc,$=function(s,r){return (r||document).querySelector(s)},$$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
-var ctx=null,tab='scripts',lastUid='',lay=(function(){try{return localStorage.getItem('aevy.lay')==='grid'?'grid':'list'}catch(e){return 'list'}})();
+var ctx=null,tab='scripts',lastUid='',lay=(function(){try{return localStorage.getItem('aevy.lay')==='list'?'list':'grid'}catch(e){return 'grid'}})();
 function safeImg(u){return /^https:\/\//i.test(u||'')?u:''}
 function av(u,n){return window.AevyEco?AevyEco.avatar(u,n):''}
 function badge(u,big){return window.AevyBadge?AevyBadge.html(u,big):''}
@@ -36,7 +36,7 @@ function header(u,own,list){
   return '<div class="pp-card ig"><div class="pp-cover'+(cv?' has':'')+'" style="--c:'+esc(u.color)+(cv?';background-image:url(\''+esc(cv)+'\')':'')+'"></div>'+
     '<div class="pp-head ig-head"><div class="pp-av ig-av"><span class="ig-ring">'+av(u,150)+'</span>'+(own?'<button type="button" class="pf-cam" data-img="avatar" aria-label="Change profile photo" title="Change profile photo">'+IC.cam+'</button>':'')+'</div>'+
     '<div class="pf-main" data-uid="'+esc(u.id)+'"><div class="pf-row"><div class="pp-id"><h1>'+esc(u.username)+'</h1><p class="pf-un">'+esc(u.name)+badge(u,true)+'</p></div>'+
-    '<div class="pf-acts">'+(own?'<button type="button" class="btn btn-sm" data-pp="edit">Edit profile</button>':'')+'<button type="button" class="btn btn-sm" data-pp="share">'+IC.share+'Share</button></div></div>'+
+    '<div class="pf-acts">'+(own?'<button type="button" class="btn btn-sm" data-pp="edit">Edit profile</button>':'')+'<button type="button" class="btn btn-sm" data-pp="share">'+IC.share+'Share</button>'+(own?'':'<button type="button" class="btn btn-sm" data-pp="report">Report</button>')+'</div></div>'+
     '<ul class="pf-stats"><li><b>'+n0(list.length)+'</b><span>'+(list.length===1?'script':'scripts')+'</span></li></ul>'+
     '<div class="ig-bio"><strong class="ig-name">'+esc(u.name)+'</strong>'+(u.bio?'<p>'+esc(u.bio)+'</p>':'')+(u.location?'<p class="ig-loc">'+IC.pin+esc(u.location)+'</p>':'')+web+
     '<p class="ig-sub">'+n0(t.dl)+' downloads &middot; '+n0(t.likes)+' likes &middot; '+rating+' &#9733;</p></div></div></div>'+
@@ -68,6 +68,7 @@ function scriptsPane(){
    '<div class="feed-list'+(lay==='grid'?' pp-grid':'')+'" id="ppCards">'+cards(list,own)+'</div>';
 }
 function cards(list,own){
+  if(lay==='grid'&&C.tileHTML&&list.length)return list.map(C.tileHTML).join('');
   return list.length?list.map(C.cardHTML).join(''):'<div class="empty"><h3>'+(own?'Nothing published yet':'No public scripts yet')+'</h3><p>'+(own?'Your scripts appear here. Only you can edit or delete them.':'Check back later.')+'</p>'+(own?'<a class="btn btn-primary" href="#/publish">Publish your first script</a>':'')+'</div>';
 }
 function savedPane(){
@@ -161,6 +162,7 @@ document.addEventListener('click',function(e){
   var a=e.target.closest('[data-pp]');
   if(!a||!a.closest('#view-profile,#view-u'))return;
   if(a.dataset.pp==='edit')openEdit();
+  if(a.dataset.pp==='report'&&ctx&&window.AevyReport)AevyReport.open('profile',ctx.u.id,'@'+ctx.u.username);
   if(a.dataset.pp==='share'&&ctx){
     var url=location.origin+location.pathname+'#/u/'+ctx.u.username;
     if(navigator.share){navigator.share({title:ctx.u.name+' (@'+ctx.u.username+') on Aevy',text:'Check out '+ctx.u.name+' on Aevy',url:url}).catch(function(){});return}

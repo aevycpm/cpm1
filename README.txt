@@ -13,14 +13,7 @@ Setup (about 5 minutes, one time)
 2. Authentication -> Sign In / Providers -> Email: enabled.
    Recommended: turn OFF "Confirm email" so new accounts can sign in at once.
    (With it ON everything still works: the user must click the emailed link before signing in.)
-3. Phone sign-in: Authentication -> Sign In / Providers -> Phone -> Enable, then pick an SMS provider
-   (Twilio, Twilio Verify, MessageBird or Vonage) and paste its keys. SMS messages are billed by that provider.
-   A country-code picker appears when a phone number is typed. It is chosen automatically (saved choice, device time
-   zone, browser language, then defaultCountry in js/config.js) and the user can change it by hand. A leading 0 is
-   dropped, so 01712345678 becomes +8801712345678. Typing +44... or 0044... uses that country instead.
-   The user confirms the number with the 6-digit SMS code.
-   Email sign-in works without this step; only phone numbers need it.
-4. Authentication -> URL Configuration:
+3. Authentication -> URL Configuration:
      Site URL        = the address where you host the site (e.g. https://yourname.github.io/aevy/)
      Redirect URLs   = add the same address, plus http://localhost:8080/ for local testing.
    Password-reset links return to these addresses.
@@ -33,7 +26,7 @@ Security (supabase/schema.sql), not by hiding the key. Never put a secret / serv
 
 What lives where
 ----------------
-Accounts        Supabase Auth (auth.users: email or phone + password, hashed by Supabase)
+Accounts        Supabase Auth (auth.users: email + password, hashed by Supabase)
 Profiles        table public.profiles      (public: username, name, bio, location, website, photo + cover address; username is unique)
 Profile photos  Storage bucket "avatars" (public read; each user can write only inside their own folder <user id>/)
 Scripts         table public.scripts       (title, language, category, visibility, preview...)
@@ -173,8 +166,8 @@ If you ran an older schema.sql, run the new one again (it adds the "ext" column 
 
 Notes
 -----
-- Sign in uses email OR phone number + password; the username is the public handle.
-- Password reset: "Forgot password?" emails a reset link (email accounts) or texts a 6-digit code (phone accounts); either way the site then asks for a new password.
+- Sign in uses email + password; the username is the public handle.
+- Password reset: "Forgot password?" emails a reset link; the site then asks for a new password.
 - Libraries load up to 1000 public scripts / profiles. Add pagination if you grow past that.
 - supabase-js 2.117.3 is loaded from cdn.jsdelivr.net, so the site needs internet.
 
@@ -190,14 +183,6 @@ Messaging (rebuilt)
 - New messages show a notification card (click to reply) and the browser tab title shows (n) unread.
 - The profile "Message" button opens the pop-up chat. No database change is needed; the existing schema.sql is enough.
 
-Discover card for new visitors (new)
-------------------------------------
-A new visitor sees, a few seconds after the site loads, a small card with up to 3 random PUBLIC scripts from other
-members. Each one has a Download button, a title that opens the script page, and "Show different scripts".
-- Nothing downloads by itself: the visitor must press Download (downloads are counted as usual).
-- Shown once per browser (localStorage key aevy.discover.v1). Never shows private scripts or the visitor's own scripts.
-- Turn off: set  discover: false  in js/config.js.  Code: js/discover.js
-
 
 Saved + Pinned scripts, profile extras (new)
 --------------------------------------------
@@ -207,3 +192,8 @@ Saved + Pinned scripts, profile extras (new)
 - Chat        Instagram-style bubbles, emoji picker, phone-safe full-screen layout.
 - Home        scripts and posts only. Signed-out visitors also see the "Follow Aevy" prompt and "Suggested accounts" strip (js/suggest.js, switch off with suggest:false in js/config.js).
 Run the new supabase/schema.sql again: it adds script_saves and script_pins with Row Level Security (safe to re-run).
+
+Reports
+- Signed-in users see a Report button on other people's scripts and profiles. Re-run supabase/schema.sql once to create the
+  reports table. Read reports in Supabase > Table Editor > reports (set status to reviewed/dismissed when done).
+- The blue Verified badge already exists: it is given automatically after 2 public scripts (Admins are always verified).

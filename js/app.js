@@ -158,16 +158,16 @@ function copyText(text){
 /* ---------- Theme ---------- */
 function setTheme(t){
   document.documentElement.setAttribute('data-theme',t);
-  var m=document.querySelector('meta[name=theme-color]');if(m)m.content=t==='light'?'#fbfbfc':'#0a0b0d';
+  var m=document.querySelector('meta[name=theme-color]');if(m)m.content=t==='light'?'#ffffff':'#000000';
   try{localStorage.setItem(K.theme,t)}catch(e){}
 }
 (function(){var t;try{t=localStorage.getItem(K.theme)}catch(e){}
-  if(!t)t=window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+  if(!t)t='light';
   setTheme(t)})();
 $('#theme').addEventListener('click',function(){setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark')});
 
 /* ---------- Router ---------- */
-var VIEWS=['home','scripts','files','publish','watch','auth','profile','u','community','messages'],current='';
+var VIEWS=['home','scripts','files','publish','watch','auth','profile','u','community','messages','about','privacy','terms','guidelines','contact'],current='';
 function route(){
   var h=(location.hash||'#/').replace(/^#\/?/,'').split('/')[0]||'home';
   if(h==='library')h='scripts';
@@ -178,9 +178,10 @@ function route(){
   if(h===current&&h!=='u'&&h!=='messages')return;
   current=h;
   $$('.view').forEach(function(v){v.classList.toggle('active',v.dataset.view===h)});
-  $$('#nav a').forEach(function(a){if(a.dataset.route===h)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
+  $$('#nav a').forEach(function(a){if(a.dataset.route===h||(h==='u'&&a.dataset.route==='profile'&&false))a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
+  $$('#tabbar a').forEach(function(a){if(a.dataset.route===h)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
   closeMenu();window.scrollTo(0,0);
-  document.title=h==='home'?'Aevy | Script Publishing':'Aevy | '+({scripts:'Scripts',files:'My files',publish:'Publish',watch:'Watch',auth:'Account',profile:'Profile',u:'Profile',community:'Community',messages:'Messages'})[h];
+  document.title=h==='home'?'Aevy | Script Publishing':'Aevy | '+({scripts:'Scripts',files:'My files',publish:'Publish',watch:'Watch',auth:'Account',profile:'Profile',u:'Profile',community:'Community',messages:'Messages',about:'About',privacy:'Privacy Policy',terms:'Terms of Service',guidelines:'Community Guidelines',contact:'Contact'})[h];
   if(h==='home'){renderHome();observeReveals();runStats()}
   if(h==='scripts')renderScripts();
   if(h==='files')renderFiles();
@@ -224,6 +225,7 @@ function pico(p){return '<svg width="18" height="18" viewBox="0 0 24 24" fill="n
 var PI={
   like:pico('<path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.6 3.7 4.5 7 4.5c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3.3 0 5.4 3.1 4.2 6.6-1.7 4.8-9.2 9.4-9.2 9.4z"/>'),
   cmt:pico('<path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 20.5l1.4-5.4A8.5 8.5 0 1 1 21 11.5z"/>'),
+  share:pico('<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"/>'),
   copy:pico('<rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15"/>'),
   dl:pico('<path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 20h14"/>'),
   globe:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18"/></svg>',
@@ -240,21 +242,30 @@ function cardHTML(s,idx){
   var peek=s.preview||'',au=postAuthor(s),id=esc(s.id);
   var tags=(s.tags||[]).slice(0,5).map(function(t){return '<span>#'+esc(String(t).replace(/^#/,'').replace(/\s+/g,''))+'</span>'}).join('');
   var liked=window.AevyStats&&AevyStats.liked&&AevyStats.liked(s.id);
-  return '<article class="card" style="--i:'+(idx||0)+'" tabindex="0" data-open="'+id+'" aria-label="Open '+esc(s.title)+'">'+
+  return '<article class="card fb-post" style="--i:'+(idx||0)+'" data-open="'+id+'">'+
    '<header class="post-head">'+au.av+
-    '<div class="post-who">'+au.nm+'<div class="post-sub"><span>'+esc(timeAgo(s.created))+'</span><span class="dot">&middot;</span>'+(s.vis==='private'?PI.lock:PI.globe)+'<span class="dot">&middot;</span><span>'+fmtSize(s.size||0)+'</span></div></div>'+
-    '<span class="vtag">'+(s.vis==='private'?'Private':esc(s.cat||'Other'))+'</span></header>'+
-   '<div class="post-body"><h3>'+esc(s.title)+'</h3><p class="d">'+esc(s.desc||'No description.')+'</p>'+(tags?'<div class="post-tags">'+tags+'</div>':'')+'</div>'+
-   '<div class="post-media"><div class="post-file"><span class="fchip"><i style="background:'+langColor(s.lang)+'"></i><span>'+esc(fileNameOf(s))+'</span></span><span>'+esc(langLabel(s.lang))+'</span></div>'+
-    '<pre class="peek" aria-hidden="true">'+highlight(peek,s.lang)+'</pre></div>'+
+    '<div class="post-who">'+au.nm+'<div class="post-sub"><span>'+esc(timeAgo(s.created))+'</span><span class="dot">&middot;</span>'+(s.vis==='private'?PI.lock:PI.globe)+'<span class="dot">&middot;</span><span>'+esc(s.vis==='private'?'Private':(s.cat||'Other'))+'</span></div></div></header>'+
+   '<div class="post-body"><h3 class="fb-title">'+esc(s.title)+'</h3><p class="d">'+esc(s.desc||'')+'</p>'+(tags?'<div class="post-tags">'+tags+'</div>':'')+'</div>'+
+   '<button type="button" class="post-dl" data-act="dl" data-id="'+id+'">'+PI.dl+'<span>Download</span><small>'+esc(fileNameOf(s))+' &middot; '+fmtSize(s.size||0)+'</small></button>'+
    (window.AevyStats?AevyStats.cardStats(s):'')+
    '<div class="post-acts">'+
     '<button class="pact'+(liked?' on':'')+'" data-act="like" data-id="'+id+'" aria-pressed="'+!!liked+'">'+PI.like+'<span>Like</span></button>'+
-    '<button class="pact" data-act="open" data-id="'+id+'">'+PI.cmt+'<span>Review</span></button>'+
-    '<button class="pact" data-act="copy" data-id="'+id+'">'+PI.copy+'<span>Copy</span></button>'+
-    '<button class="pact" data-act="dl" data-id="'+id+'">'+PI.dl+'<span>Download</span></button>'+
+    '<button class="pact" data-act="cmt" data-id="'+id+'" aria-expanded="false">'+PI.cmt+'<span>Comment</span></button>'+
+    '<button class="pact" data-act="share" data-id="'+id+'">'+PI.share+'<span>Share</span></button>'+
     (window.AevySaved?AevySaved.btn(s.id):'')+
    '</div></article>';
+}
+function tileHTML(s){
+  var id=esc(s.id),pv=String(s.preview||'').split('\n').slice(0,9).join('\n');
+  return '<div class="tile" data-open="'+id+'" role="button" tabindex="0" aria-label="'+esc(s.title)+'" style="--lc:'+langColor(s.lang)+'">'+
+   '<span class="t-lang">'+esc(langLabel(s.lang))+'</span>'+
+   '<div class="t-title">'+esc(s.title)+'</div>'+
+   '<div class="t-ov"><span><svg viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.6 3.7 4.5 7 4.5c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3.3 0 5.4 3.1 4.2 6.6-1.7 4.8-9.2 9.4-9.2 9.4z"/></svg>'+(s.likes||0)+'</span>'+
+   '<span><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 20h14"/></svg>'+(s.downloads||0)+'</span></div></div>';
+}
+function shareScript(s){
+  var url=location.origin+location.pathname+'#/scripts',data={title:s.title,text:s.title+' on Aevy',url:url};
+  if(navigator.share){navigator.share(data).catch(function(){})}else copyText(url);
 }
 document.addEventListener('click',function(e){
   var a=e.target.closest('[data-act]');
@@ -264,16 +275,17 @@ document.addEventListener('click',function(e){
     var act=a.dataset.act;
     if(act==='dl')downloadOne(s);
     if(act==='copy')copyScript(s);
+    if(act==='share')shareScript(s);
     if(act==='open')openScript(s.id);
     if(act==='like'&&window.AevyStats)AevyStats.like(s,a);
     if(act==='save'&&window.AevySaved)AevySaved.toggle(s);
     if(act==='del')deleteScript(s);
     return;
   }
-  var c=e.target.closest('[data-open]');if(c)openScript(c.dataset.open);
+  var c=e.target.closest('[data-open]');if(c&&!c.classList.contains('fb-post'))openScript(c.dataset.open);
 });
 document.addEventListener('keydown',function(e){
-  if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('.card')){e.preventDefault();openScript(e.target.dataset.open)}
+  if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('.card,.tile')){e.preventDefault();openScript(e.target.dataset.open)}
 });
 function deleteScript(s,after){
   if(!isOwner(s)&&!(window.AevyAuth.isAdmin&&AevyAuth.isAdmin())){toast('Only the publisher or an Admin can do that');return}
@@ -314,7 +326,7 @@ function renderScripts(){
     if(sort==='rated')return (b.rcount?b.rsum/b.rcount:0)-(a.rcount?a.rsum/a.rcount:0)||b.rcount-a.rcount;
     return b.created-a.created;
   });
-  $('#cards').innerHTML=list.length?list.map(cardHTML).join(''):'<div class="empty"><h3>'+(vis().length?'Nothing matches':'Your library is empty')+'</h3><p>'+(vis().length?'Try a different search or language.':'Publish a script to get started.')+'</p></div>';
+  $('#cards').innerHTML=list.length?list.map(tileHTML).join(''):'<div class="empty"><h3>'+(vis().length?'Nothing matches':'Your library is empty')+'</h3><p>'+(vis().length?'Try a different search or language.':'Publish a script to get started.')+'</p></div>';
 }
 $('#chips').addEventListener('click',function(e){var b=e.target.closest('[data-f]');if(!b)return;filter=b.dataset.f;renderScripts()});
 $('#q').addEventListener('input',renderScripts);
@@ -483,7 +495,7 @@ function renderScriptBody(s,code,edit){
     var v=parseVideo(s.video);
     body.innerHTML=
       '<div class="dlg-bar"><button class="btn btn-primary btn-lg" data-a="download">'+ICON.dl+'Download '+esc(fileNameOf(s))+'</button>'+
-        (isOwner(s)?'<button class="btn btn-lg" data-a="edit">Edit</button>':'')+'<button class="btn btn-lg" data-a="copy">Copy</button><button class="btn btn-lg" data-a="fork">Fork</button>'+((isOwner(s)||(window.AevyAuth.isAdmin&&AevyAuth.isAdmin()))?'<button class="btn btn-lg btn-danger" data-a="delete">Delete</button>':'')+'</div>'+
+        (isOwner(s)?'<button class="btn btn-lg" data-a="edit">Edit</button>':'')+'<button class="btn btn-lg" data-a="copy">Copy</button><button class="btn btn-lg" data-a="fork">Fork</button>'+((isOwner(s)||(window.AevyAuth.isAdmin&&AevyAuth.isAdmin()))?'<button class="btn btn-lg btn-danger" data-a="delete">Delete</button>':'')+(isOwner(s)?'':'<button class="btn btn-lg" data-a="report">Report</button>')+'</div>'+
       (s.desc?'<p class="desc">'+esc(s.desc)+'</p>':'')+
       ((s.tags&&s.tags.length)?'<div class="tags">'+s.tags.map(function(t){return '<span class="tag">'+esc(t)+'</span>'}).join('')+'</div>':'')+
       (v?'<div>'+playerHTML(v)+'</div>':'')+
@@ -505,6 +517,7 @@ $('#dlgBody').addEventListener('click',function(e){
     DB.createScript({title:(s.title+' (copy)').slice(0,80),lang:s.lang,author:me().name,desc:s.desc,tags:s.tags,cat:s.cat,vis:'private',video:s.video},openCode).then(function(c){upsertLocal(c);toast('Forked as a private script');openScript(c.id);refreshLists()},function(x){b.disabled=false;fail(x)});
   }
   if(a==='delete')deleteScript(s,function(){dlg.close()});
+  if(a==='report'&&window.AevyReport)AevyReport.open('script',s.id,s.title);
 });
 dlg.addEventListener('click',function(e){if(e.target===dlg||e.target.closest('[data-close]'))dlg.close()});
 $('#dlgClose').addEventListener('click',function(){dlg.close()});
@@ -649,7 +662,7 @@ function importLocal(){
   });
 }
 
-window.AevyCore={all:function(){return scripts},vis:vis,mine:mine,cats:CATS,cardHTML:cardHTML,toast:toast,esc:esc,fmtDate:fmtDate,
+window.AevyCore={tileHTML:tileHTML,all:function(){return scripts},vis:vis,mine:mine,cats:CATS,cardHTML:cardHTML,toast:toast,esc:esc,fmtDate:fmtDate,
   localCount:function(){return oldScripts().length},importLocal:importLocal,
   purgeFiles:function(){return DB.purgeMyFiles()},
   dropOwner:function(id){scripts=scripts.filter(function(s){return s.owner!==id});videos=[]},
