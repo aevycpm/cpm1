@@ -4,5 +4,6 @@
    NEVER put a "secret" or "service_role" key in this file. */
 window.AEVY_CONFIG = {
   url: 'https://jjtgwzyupfqfnbkntkep.supabase.co',
-  key: 'sb_publishable_ATZhUhGKT0KIDAQMbO2TKQ_ASu97PPj'
+  key: 'sb_publishable_ATZhUhGKT0KIDAQMbO2TKQ_ASu97PPj',
+  newDays: 7   /* how long the "New" badge shows; keep equal to aevy_new_user_days() in schema.sql */
 };

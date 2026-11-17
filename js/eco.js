@@ -5,7 +5,12 @@ var C=window.AevyCore,A=window.AevyAuth,esc=C.esc;
 function $(s){return document.querySelector(s)}
 function mk(id,html){var s=document.createElement('section');s.className='view';s.id='view-'+id;s.dataset.view=id;s.innerHTML=html;$('main').appendChild(s);return s}
 function head(e,t,p){return '<div class="page-head"><div class="wrap"><p class="eyebrow">'+e+'</p><h1>'+t+'</h1>'+(p?'<p>'+p+'</p>':'')+'</div></div>'}
-function avatar(u,sz){return '<span class="avatar" style="--c:'+u.color+';width:'+sz+'px;height:'+sz+'px;font-size:'+sz*.42+'px">'+esc((u.name||u.username).charAt(0).toUpperCase())+'</span>'}
+function safeImg(u){return /^https:\/\//i.test(u||'')?u:''}
+function avatar(u,sz){
+  var st='--c:'+u.color+';width:'+sz+'px;height:'+sz+'px;font-size:'+Math.round(sz*.42)+'px',img=safeImg(u.avatar);
+  if(img)return '<span class="avatar has-img" data-uid="'+esc(u.id||'')+'" style="'+st+'"><img src="'+esc(img)+'" alt="" loading="lazy" decoding="async"></span>';
+  return '<span class="avatar" data-uid="'+esc(u.id||'')+'" style="'+st+'">'+esc((u.name||u.username).charAt(0).toUpperCase())+'</span>';
+}
 function err(box,e){box.textContent=e.message||String(e)}
 function changed(){window.dispatchEvent(new Event('aevy:auth'))}
 
@@ -87,36 +92,95 @@ $('#dOut').onclick=function(){A.signOut().then(function(){changed();renderAuth()
 
 mk('profile','<div id="profBody"></div>');
 mk('u','<div id="pubBody"></div>');
-mk('publishers','<div id="pubsBody"></div>');
 
-function stats(list){var b=0;list.forEach(function(s){b+=s.size||0});return list.length+' script'+(list.length===1?'':'s')+' · '+(b/1024).toFixed(1)+' KB'}
+var PIN='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>';
+var LINK='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
+var CAL='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>';
+var CAM='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l1.6-2.5h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/></svg>';
+function n0(n){return (n||0).toLocaleString()}
+function totals(list){
+  var t={scripts:list.length,dl:0,likes:0,views:0,rs:0,rc:0};
+  list.forEach(function(s){t.dl+=s.downloads||0;t.likes+=s.likes||0;t.views+=s.views||0;t.rs+=s.rsum||0;t.rc+=s.rcount||0});
+  return t;
+}
+/* Facebook / Instagram style header: cover photo, round profile photo, counts, bio and details. */
+function pfHeader(u,own,list,mine){
+  var t=totals(list),cv=safeImg(u.cover);
+  var meta=[];
+  if(u.location)meta.push('<li>'+PIN+'<span>'+esc(u.location)+'</span></li>');
+  if(u.website)meta.push('<li>'+LINK+'<a href="'+esc(u.website)+'" target="_blank" rel="noopener noreferrer nofollow">'+esc(u.website.replace(/^https?:\/\/(www\.)?/i,'').replace(/\/$/,''))+'</a></li>');
+  meta.push('<li>'+CAL+'<span>Joined '+C.fmtDate(u.created)+'</span></li>');
+  var acts=own?(mine?'<a class="btn btn-sm" href="#/u/'+esc(u.username)+'">View as visitor</a>':'<a class="btn btn-primary btn-sm" href="#/profile">Edit profile</a>'):'';
+  return '<div class="pf-cover'+(cv?' has':'')+'" style="--c:'+esc(u.color)+(cv?';background-image:url(\''+esc(cv)+'\')':'')+'">'+
+    (own&&mine?'<div class="pf-cbtns"><button type="button" class="btn btn-sm" data-img="cover">'+CAM+(cv?'Change cover':'Add cover photo')+'</button>'+(cv?'<button type="button" class="btn btn-sm" data-rm="cover">Remove</button>':'')+'</div>':'')+'</div>'+
+    '<div class="wrap pf-top"><div class="pf-av">'+avatar(u,132)+(own&&mine?'<button type="button" class="pf-cam" data-img="avatar" aria-label="Change profile photo" title="Change profile photo">'+CAM+'</button>':'')+'</div>'+
+    '<div class="pf-main" data-uid="'+esc(u.id)+'"><div class="pf-row"><div><h1>'+esc(u.name)+(window.AevyBadge?AevyBadge.html(u,true):'')+'</h1><p class="pf-un">@'+esc(u.username)+'</p></div><div class="pf-acts">'+acts+'</div></div>'+
+    '<ul class="pf-stats"><li><b>'+n0(t.scripts)+'</b><span>Scripts</span></li><li><b>'+n0(t.dl)+'</b><span>Downloads</span></li><li><b>'+n0(t.likes)+'</b><span>Likes</span></li><li><b>'+(t.rc?(t.rs/t.rc).toFixed(1):'-')+'</b><span>Rating</span></li></ul>'+
+    (u.bio?'<p class="pf-bio">'+esc(u.bio)+'</p>':'')+'<ul class="pf-meta">'+meta.join('')+'</ul></div></div>';
+}
+/* ---- photo picking: shrink in the browser (profile 400x400, cover 1500x500) so uploads stay small ---- */
+function shrink(file,w,h){
+  return new Promise(function(res,rej){
+    if(!/^image\/(jpeg|png|webp|gif)$/.test(file.type))return rej(new Error('Choose a JPG, PNG or WebP image'));
+    if(file.size>15*1048576)return rej(new Error('That image is too large (max 15 MB)'));
+    var url=URL.createObjectURL(file),img=new Image();
+    img.onload=function(){
+      var sw=img.naturalWidth,sh=img.naturalHeight,r=Math.max(w/sw,h/sh),dw=sw*r,dh=sh*r;
+      var c=document.createElement('canvas');c.width=w;c.height=h;var x=c.getContext('2d');
+      x.fillStyle='#fff';x.fillRect(0,0,w,h);x.imageSmoothingQuality='high';x.drawImage(img,(w-dw)/2,(h-dh)/2,dw,dh);
+      URL.revokeObjectURL(url);
+      c.toBlob(function(b){b?res(b):rej(new Error('Could not process the image'))},'image/jpeg',.86);
+    };
+    img.onerror=function(){URL.revokeObjectURL(url);rej(new Error('That file is not a readable image'))};
+    img.src=url;
+  });
+}
+var pickKind='';
+var picker=document.createElement('input');picker.type='file';picker.accept='image/jpeg,image/png,image/webp';picker.hidden=true;document.body.appendChild(picker);
+picker.addEventListener('change',function(){
+  var f=picker.files&&picker.files[0],kind=pickKind;picker.value='';
+  if(!f||!kind)return;
+  C.toast(kind==='avatar'?'Uploading profile photo...':'Uploading cover photo...');
+  (kind==='avatar'?shrink(f,400,400):shrink(f,1500,500)).then(function(b){return A.setImage(kind,b)}).then(function(){C.toast(kind==='avatar'?'Profile photo updated':'Cover photo updated');C.refresh()},function(x){C.toast(x.message||'Upload failed')});
+});
+document.addEventListener('click',function(e){
+  var b=e.target.closest('[data-img]'),r=e.target.closest('[data-rm]');
+  if(b&&b.closest('#view-profile,#view-u')){pickKind=b.dataset.img;picker.click()}
+  if(r&&r.closest('#view-profile,#view-u')){A.removeImage(r.dataset.rm).then(function(){C.toast('Removed');C.refresh()},function(x){C.toast(x.message)})}
+});
+
 function renderProfile(){
-  var m=A.current();if(!m)return;var mine=C.mine(),lg=C.localCount();
-  $('#profBody').innerHTML=head('Your profile',esc(m.name),'@'+esc(m.username)+' · member since '+C.fmtDate(m.created))+
-  '<div class="wrap prof-grid"><form class="form" id="pf"><h2>Edit profile</h2><p class="note">Signed in as '+esc(A.email())+'</p><div><label class="l" for="pName">Display name</label><input class="field" id="pName" maxlength="40" value="'+esc(m.name)+'"></div><div><label class="l" for="pBio">Bio</label><textarea class="field" id="pBio" maxlength="280" rows="3">'+esc(m.bio)+'</textarea></div><button class="btn btn-primary">Save profile</button></form>'+
+  var m=A.current();if(!m)return;
+  if(window.AevyProfile){AevyProfile.render('#profBody',m,true);return}
+  var mine=C.mine(),lg=C.localCount();
+  $('#profBody').innerHTML=pfHeader(m,true,mine,true)+
+  '<div class="wrap prof-grid"><form class="form" id="pf"><h2>Edit profile</h2><p class="note">Signed in as '+esc(A.email())+'</p>'+
+  '<div><label class="l" for="pName">Display name</label><input class="field" id="pName" maxlength="40" value="'+esc(m.name)+'"></div>'+
+  '<div><label class="l" for="pBio">Bio</label><textarea class="field" id="pBio" maxlength="280" rows="3" placeholder="Tell people about yourself">'+esc(m.bio)+'</textarea></div>'+
+  '<div class="row2"><div><label class="l" for="pLoc">Location</label><input class="field" id="pLoc" maxlength="40" value="'+esc(m.location)+'" placeholder="City, Country"></div>'+
+  '<div><label class="l" for="pWeb">Website</label><input class="field" id="pWeb" maxlength="100" inputmode="url" value="'+esc(m.website)+'" placeholder="https://"></div></div>'+
+  '<p class="ferr" role="alert" id="pfErr"></p><button class="btn btn-primary">Save profile</button></form>'+
   '<form class="form" id="pw"><h2>Password</h2><input class="field" id="pOld" type="password" placeholder="Current password" autocomplete="current-password" required><input class="field" id="pNew" type="password" placeholder="New password (8+)" autocomplete="new-password" required><p class="ferr" role="alert"></p><button class="btn">Change password</button></form></div>'+
-  '<div class="wrap"><div class="sec-head"><div><p class="eyebrow">Upload management</p><h2>Your scripts ('+mine.length+')</h2></div><div class="row-btns"><a class="btn btn-primary" href="#/publish">Publish script</a><a class="btn" href="#/u/'+esc(m.username)+'">View public page</a></div></div>'+
+  '<div class="wrap"><div class="sec-head"><div><p class="eyebrow">Upload management</p><h2>Your scripts ('+mine.length+')</h2></div><div class="row-btns"><a class="btn btn-primary" href="#/publish">Publish script</a></div></div>'+
   (lg?'<div class="notice">'+lg+' script'+(lg===1?'':'s')+' found in this browser from the old local version. <button class="btn" id="claim">Upload '+(lg===1?'it':'them')+' to your account</button></div>':'')+
   '<div class="cards" id="myCards">'+(mine.length?mine.map(C.cardHTML).join(''):'<div class="empty"><h3>Nothing published yet</h3><p>Your scripts appear here, and only you can edit or delete them.</p></div>')+'</div>'+
-  '<div class="danger-zone"><h3>Delete account</h3><p>Permanently removes your account, profile, every script you published and all their files.</p><form id="del"><input class="field" id="dPw" type="password" placeholder="Confirm password" required><button class="btn btn-danger">Delete account</button></form><p class="ferr" id="dErr" role="alert"></p></div></div>';
-  $('#pf').onsubmit=function(e){e.preventDefault();A.update({name:$('#pName').value,bio:$('#pBio').value}).then(function(){C.toast('Profile saved');changed()},function(x){C.toast(x.message)})};
+  '<div class="danger-zone"><h3>Delete account</h3><p>Permanently removes your account, profile, photos, every script you published and all their files.</p><form id="del"><input class="field" id="dPw" type="password" placeholder="Confirm password" required><button class="btn btn-danger">Delete account</button></form><p class="ferr" id="dErr" role="alert"></p></div></div>';
+  $('#pf').onsubmit=function(e){e.preventDefault();var er=$('#pfErr');er.textContent='';A.update({name:$('#pName').value,bio:$('#pBio').value,location:$('#pLoc').value,website:$('#pWeb').value}).then(function(){C.toast('Profile saved');C.refresh()},function(x){er.textContent=x.message})};
   $('#pw').onsubmit=function(e){e.preventDefault();var b=this.querySelector('.ferr'),f=this;A.changePassword($('#pOld').value,$('#pNew').value).then(function(){f.reset();b.textContent='';C.toast('Password changed')},function(x){err(b,x)})};
   if($('#claim'))$('#claim').onclick=function(){var bt=this;bt.disabled=true;bt.textContent='Uploading...';C.importLocal().then(function(n){C.toast(n+' script(s) uploaded');changed()},function(x){bt.disabled=false;C.toast(x.message)})};
-  $('#del').onsubmit=function(e){e.preventDefault();if(!confirm('Delete your account and all your scripts? This cannot be undone.'))return;A.remove($('#dPw').value,C.purgeFiles).then(function(){C.dropOwner(m.id);changed();location.hash='#/'},function(x){err($('#dErr'),x)})};
+  $('#del').onsubmit=function(e){e.preventDefault();if(!confirm('Delete your account and all your scripts? This cannot be undone.'))return;A.remove($('#dPw').value,function(){return A.purgeImages().then(C.purgeFiles)}).then(function(){C.dropOwner(m.id);changed();location.hash='#/'},function(x){err($('#dErr'),x)})};
 }
 function renderPublisher(raw){
   var name=decodeURIComponent((raw.split('/')[1]||'')),u=A.byName(name),box=$('#pubBody');
-  if(!u){box.innerHTML=head('Publisher','Not found','No publisher uses that name.');return}
-  var list=C.vis().filter(function(s){return s.owner===u.id}),own=A.current()&&A.current().id===u.id;
-  box.innerHTML='<div class="page-head"><div class="wrap pub-head">'+avatar(u,72)+'<div><p class="eyebrow">Publisher</p><h1>'+esc(u.name)+'</h1><p>@'+esc(u.username)+' · joined '+C.fmtDate(u.created)+' · '+stats(list)+'</p>'+(u.bio?'<p class="bio">'+esc(u.bio)+'</p>':'')+'</div></div></div><div class="wrap"><div class="cards" style="padding-top:28px">'+(list.length?list.map(C.cardHTML).join(''):'<div class="empty"><h3>No public scripts</h3></div>')+'</div></div>';
-}
-function renderPublishers(){
-  var us=A.all(),pubs=us.map(function(u){return {u:u,n:C.vis().filter(function(s){return s.owner===u.id}).length}}).sort(function(a,b){return b.n-a.n});
-  $('#pubsBody').innerHTML=head('Community','Publishers','Everyone who publishes on Aevy.')+'<div class="wrap"><div class="cards" style="padding-top:28px">'+(pubs.length?pubs.map(function(p){return '<a class="card pcard" href="#/u/'+esc(p.u.username)+'" style="opacity:1;animation:none">'+avatar(p.u,48)+'<h3>'+esc(p.u.name)+'</h3><p class="d">@'+esc(p.u.username)+' · '+p.n+' public script'+(p.n===1?'':'s')+'</p></a>'}).join(''):'<div class="empty"><h3>No publishers yet</h3><p><a href="#/auth"><u>Create the first account</u></a></p></div>')+'</div></div>';
+  if(!u){box.innerHTML=head('Profile','Not found','Nobody uses that username.');return}
+  if(window.AevyProfile){AevyProfile.render('#pubBody',u,!!A.current()&&A.current().id===u.id);return}
+  var list=C.vis().filter(function(s){return s.owner===u.id}),own=!!A.current()&&A.current().id===u.id;
+  box.innerHTML=pfHeader(u,own,list,false)+'<div class="wrap"><div class="pf-tab"><span>Scripts</span><small>'+list.length+'</small></div><div class="cards" style="padding-top:20px">'+
+    (list.length?list.map(C.cardHTML).join(''):'<div class="empty"><h3>No public scripts yet</h3><p>'+(own?'<a href="#/publish"><u>Publish your first script</u></a>':'Check back later.')+'</p></div>')+'</div></div>';
 }
 function userSlot(){
   var m=A.current(),s=$('#userSlot');
-  s.innerHTML=m?'<a class="userchip" href="#/profile" aria-label="Your profile">'+avatar(m,28)+'<span class="hide-sm">'+esc(m.username)+'</span></a><button class="btn btn-sm" id="so">Sign out</button>':'<a class="btn btn-sm" href="#/auth">Sign in</a>';
+  s.innerHTML=m?'<a class="userchip" href="#/profile" aria-label="Your profile">'+avatar(m,28)+'<span class="hide-sm">'+esc(m.username)+'</span>'+(window.AevyBadge?AevyBadge.html(m):'')+'</a><button class="btn btn-sm" id="so">Sign out</button>':'<a class="btn btn-sm" href="#/auth">Sign in</a>';
   var so=$('#so');if(so)so.onclick=function(){A.signOut().then(function(){changed();location.hash='#/'})};
   var pb=document.querySelector('.bar-actions .btn-primary');if(pb)pb.hidden=false;
 }
@@ -132,12 +196,11 @@ function publishForm(){
   var v=document.createElement('div');v.innerHTML='<label class="l" for="fVis">Visibility</label><select class="field sel" id="fVis" style="width:100%"><option value="public">Public (anyone can view and download)</option><option value="private">Private (only you)</option></select>';
   row.parentNode.insertBefore(v,row.nextSibling);
 }
-window.AevyEco={render:function(h,raw){
+window.AevyEco={avatar:avatar,pick:function(k){pickKind=k;picker.click()},render:function(h,raw){
   userSlot();
   if(h==='auth')renderAuth();
   if(h==='profile')renderProfile();
   if(h==='u')renderPublisher(raw);
-  if(h==='publishers')renderPublishers();
   if(h==='scripts')catChips();
 }};
 /* Password reset: the email link signs the visitor in and Supabase fires a recovery event; ask for the new password. */
@@ -154,5 +217,4 @@ function showRecovery(){
 window.addEventListener('aevy:recovery',function(){recShown=false;showRecovery()});
 A.ready.then(showRecovery);
 publishForm();userSlot();
-document.addEventListener('click',function(e){var c=e.target.closest('.pcard');if(c)e.stopPropagation()},true);
 })();

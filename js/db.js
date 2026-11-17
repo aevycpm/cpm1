@@ -32,7 +32,8 @@ function meta(code){
 function ms(t){var n=t?Date.parse(t):NaN;return isNaN(n)?Date.now():n}
 function toScript(r){
   return {id:r.id,owner:r.owner,title:r.title,lang:r.lang,author:r.author,desc:r.description,tags:r.tags||[],cat:r.cat,vis:r.vis,video:r.video,
-    path:r.id,ext:r.ext||'',size:r.size,lines:r.lines,preview:r.preview,created:ms(r.created),updated:ms(r.updated)};
+    path:r.id,ext:r.ext||'',size:r.size,lines:r.lines,preview:r.preview,created:ms(r.created),updated:ms(r.updated),
+    downloads:r.downloads||0,views:r.views||0,likes:r.likes||0,rsum:r.rating_sum||0,rcount:r.rating_count||0};
 }
 function userId(){var m=window.AevyAuth.current();if(!m)throw new Error('Sign in first');return m.id}
 function row(f){
@@ -46,10 +47,13 @@ function err(e){
   if(e&&/failed to fetch|networkerror|load failed/i.test(e.message||''))return new Error('Cannot reach the server. Check your connection and retry');
   return e instanceof Error?e:new Error((e&&e.message)||'Request failed');
 }
+/* the database sets the Verified badge after a publish / delete: reload profiles so it shows at once */
+function refreshBadge(){try{window.AevyAuth.refreshProfiles().then(function(){window.dispatchEvent(new Event('aevy:badges'))},function(){})}catch(e){}}
 function must(r){if(r.error)throw r.error;return r.data}
 var COLS='*';
 
 window.AevyDB={
+  toScript:toScript,
   /* All scripts the current viewer may see: every public one plus the viewer's own private ones. */
   listScripts:function(){
     var q=[sb.from('scripts').select(COLS).eq('vis','public').order('created',{ascending:false}).limit(1000).then(must)],m=window.AevyAuth.current();
@@ -82,7 +86,7 @@ window.AevyDB={
           /* do not leave a script without a file behind */
           return sb.from('scripts').delete().eq('id',id).then(function(){throw x.error});
         }
-        var s=toScript(d);codeCache[s.id]={u:s.updated,code:code};return s;
+        var s=toScript(d);codeCache[s.id]={u:s.updated,code:code};refreshBadge();return s;
       });
     }).then(null,function(e){throw err(e)});
   },
@@ -107,7 +111,7 @@ window.AevyDB={
   deleteScript:function(s){
     return sb.from('scripts').delete().eq('id',s.id).select('id').then(must).then(function(rows){
       if(!rows.length)throw new Error('Not allowed. You can only change your own scripts');
-      delete codeCache[s.id];
+      delete codeCache[s.id];refreshBadge();
     }).then(null,function(e){throw err(e)});
   },
   /* removes every script (with its file) and saved video of the signed-in user; used before account deletion */

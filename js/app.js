@@ -140,10 +140,11 @@ function zipScripts(list,label){
     var d=new Date().toISOString().slice(0,10);
     download('aevy-'+(label||'scripts')+'-'+d+'.zip',makeZip(files));
     toast('Downloaded '+list.length+' file'+(list.length===1?'':'s')+' as a zip');
+    if(window.AevyStats)AevyStats.downloaded(list);
   }).catch(fail);
 }
 function downloadOne(s){
-  DB.getCode(s).then(function(code){var n=fileNameOf(s);download(n,code);toast('Downloaded '+n)}).catch(fail);
+  DB.getCode(s).then(function(code){var n=fileNameOf(s);download(n,code);toast('Downloaded '+n);if(window.AevyStats)AevyStats.downloaded([s])}).catch(fail);
 }
 function copyScript(s){DB.getCode(s).then(function(c){if(BIN.isBin(c)){toast('Binary file: use Download');return}copyText(c)}).catch(fail)}
 function copyText(text){
@@ -166,26 +167,29 @@ function setTheme(t){
 $('#theme').addEventListener('click',function(){setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark')});
 
 /* ---------- Router ---------- */
-var VIEWS=['home','scripts','files','publish','watch','auth','profile','u','publishers'],current='';
+var VIEWS=['home','scripts','files','publish','watch','auth','profile','u','community','messages'],current='';
 function route(){
   var h=(location.hash||'#/').replace(/^#\/?/,'').split('/')[0]||'home';
   if(h==='library')h='scripts';
   if(VIEWS.indexOf(h)<0)h='home';
   var raw=(location.hash||'#/').replace(/^#\/?/,'');
-  if((h==='publish'||h==='files'||h==='profile')&&!me()){location.hash='#/auth';return}
+  if((h==='publish'||h==='files'||h==='profile'||h==='messages')&&!me()){location.hash='#/auth';return}
   if(h==='auth'&&me()){location.hash='#/profile';return}
-  if(h===current&&h!=='u')return;
+  if(h===current&&h!=='u'&&h!=='messages')return;
   current=h;
   $$('.view').forEach(function(v){v.classList.toggle('active',v.dataset.view===h)});
   $$('#nav a').forEach(function(a){if(a.dataset.route===h)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
   closeMenu();window.scrollTo(0,0);
-  document.title=h==='home'?'Aevy | Script Publishing':'Aevy | '+({scripts:'Scripts',files:'My files',publish:'Publish',watch:'Watch',auth:'Account',profile:'Profile',u:'Publisher',publishers:'Publishers'})[h];
+  document.title=h==='home'?'Aevy | Script Publishing':'Aevy | '+({scripts:'Scripts',files:'My files',publish:'Publish',watch:'Watch',auth:'Account',profile:'Profile',u:'Profile',community:'Community',messages:'Messages'})[h];
   if(h==='home'){renderHome();observeReveals();runStats()}
   if(h==='scripts')renderScripts();
   if(h==='files')renderFiles();
   if(h==='publish')updatePreview();
   if(h==='watch')renderVList();
   if(window.AevyEco)AevyEco.render(h,raw);
+  if(window.AevySocial)AevySocial.render(h,raw);
+  if(window.AevyCommunity)AevyCommunity.render(h);
+  if(window.AevyStats)AevyStats.render(h);
 }
 window.addEventListener('hashchange',route);
 window.addEventListener('aevy:auth',function(){loadAll().catch(function(){scripts=scripts.filter(canSee);videos=[]}).then(function(){current='';route()})});
@@ -208,14 +212,48 @@ function runStats(){
 }
 
 /* ---------- Cards ---------- */
+function timeAgo(t){
+  var d=Math.max(0,(Date.now()-t)/1000);
+  if(d<45)return 'Just now';
+  if(d<3600)return Math.round(d/60)+' min';
+  if(d<86400)return Math.round(d/3600)+' h';
+  if(d<86400*7)return Math.round(d/86400)+' d';
+  return fmtDate(t);
+}
+function pico(p){return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+p+'</svg>'}
+var PI={
+  like:pico('<path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.6 3.7 4.5 7 4.5c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3.3 0 5.4 3.1 4.2 6.6-1.7 4.8-9.2 9.4-9.2 9.4z"/>'),
+  cmt:pico('<path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 20.5l1.4-5.4A8.5 8.5 0 1 1 21 11.5z"/>'),
+  copy:pico('<rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15"/>'),
+  dl:pico('<path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 20h14"/>'),
+  globe:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18"/></svg>',
+  lock:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
+};
+function postAuthor(s){
+  var u=window.AevyAuth&&AevyAuth.byId?AevyAuth.byId(s.owner):null;
+  var name=(u&&(u.name||u.username))||s.author||'Anonymous';
+  var av=u&&window.AevyEco?AevyEco.avatar(u,40):'<span class="avatar" style="width:40px;height:40px;font-size:17px">'+esc(name.charAt(0).toUpperCase())+'</span>';
+  var nm=u&&u.username?'<span class="nm-line"><a class="post-name" href="#/u/'+esc(u.username)+'">'+esc(name)+'</a>'+(window.AevyBadge?AevyBadge.html(u):'')+'</span>':'<span class="post-name">'+esc(name)+'</span>';
+  return {av:av,nm:nm,link:!!(u&&u.username)};
+}
 function cardHTML(s,idx){
-  var peek=s.preview||'';
-  return '<article class="card" style="--i:'+(idx||0)+'" tabindex="0" data-open="'+esc(s.id)+'" aria-label="Open '+esc(s.title)+'">'+
-   '<div class="card-top"><span class="fchip"><i style="background:'+langColor(s.lang)+'"></i><span>'+esc(fileNameOf(s))+'</span></span>'+(s.vis==='private'?'<span class="vtag">Private</span>':'<span class="vtag">'+esc(s.cat||'Other')+'</span>')+'</div>'+
-   '<h3>'+esc(s.title)+'</h3><p class="d">'+esc(s.desc||'No description.')+'</p>'+
-   '<pre class="peek" aria-hidden="true">'+highlight(peek,s.lang)+'</pre>'+
-   '<div class="card-foot"><small>'+esc(s.author||'Anonymous')+' &middot; '+fmtSize(s.size||0)+'</small>'+
-   '<div class="card-btns"><button class="btn" data-act="copy" data-id="'+esc(s.id)+'">Copy</button><button class="btn btn-primary" data-act="dl" data-id="'+esc(s.id)+'">'+ICON.dl+'Download</button></div></div></article>';
+  var peek=s.preview||'',au=postAuthor(s),id=esc(s.id);
+  var tags=(s.tags||[]).slice(0,5).map(function(t){return '<span>#'+esc(String(t).replace(/^#/,'').replace(/\s+/g,''))+'</span>'}).join('');
+  var liked=window.AevyStats&&AevyStats.liked&&AevyStats.liked(s.id);
+  return '<article class="card" style="--i:'+(idx||0)+'" tabindex="0" data-open="'+id+'" aria-label="Open '+esc(s.title)+'">'+
+   '<header class="post-head">'+au.av+
+    '<div class="post-who">'+au.nm+'<div class="post-sub"><span>'+esc(timeAgo(s.created))+'</span><span class="dot">&middot;</span>'+(s.vis==='private'?PI.lock:PI.globe)+'<span class="dot">&middot;</span><span>'+fmtSize(s.size||0)+'</span></div></div>'+
+    '<span class="vtag">'+(s.vis==='private'?'Private':esc(s.cat||'Other'))+'</span></header>'+
+   '<div class="post-body"><h3>'+esc(s.title)+'</h3><p class="d">'+esc(s.desc||'No description.')+'</p>'+(tags?'<div class="post-tags">'+tags+'</div>':'')+'</div>'+
+   '<div class="post-media"><div class="post-file"><span class="fchip"><i style="background:'+langColor(s.lang)+'"></i><span>'+esc(fileNameOf(s))+'</span></span><span>'+esc(langLabel(s.lang))+'</span></div>'+
+    '<pre class="peek" aria-hidden="true">'+highlight(peek,s.lang)+'</pre></div>'+
+   (window.AevyStats?AevyStats.cardStats(s):'')+
+   '<div class="post-acts">'+
+    '<button class="pact'+(liked?' on':'')+'" data-act="like" data-id="'+id+'" aria-pressed="'+!!liked+'">'+PI.like+'<span>Like</span></button>'+
+    '<button class="pact" data-act="open" data-id="'+id+'">'+PI.cmt+'<span>Review</span></button>'+
+    '<button class="pact" data-act="copy" data-id="'+id+'">'+PI.copy+'<span>Copy</span></button>'+
+    '<button class="pact" data-act="dl" data-id="'+id+'">'+PI.dl+'<span>Download</span></button>'+
+   '</div></article>';
 }
 document.addEventListener('click',function(e){
   var a=e.target.closest('[data-act]');
@@ -226,6 +264,7 @@ document.addEventListener('click',function(e){
     if(act==='dl')downloadOne(s);
     if(act==='copy')copyScript(s);
     if(act==='open')openScript(s.id);
+    if(act==='like'&&window.AevyStats)AevyStats.like(s,a);
     if(act==='del')deleteScript(s);
     return;
   }
@@ -235,7 +274,7 @@ document.addEventListener('keydown',function(e){
   if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('.card')){e.preventDefault();openScript(e.target.dataset.open)}
 });
 function deleteScript(s,after){
-  if(!needOwner(s))return;
+  if(!isOwner(s)&&!(window.AevyAuth.isAdmin&&AevyAuth.isAdmin())){toast('Only the publisher or an Admin can do that');return}
   if(!confirm('Delete "'+s.title+'"? This removes the file from cloud storage. Download it first if you want a copy.'))return;
   DB.deleteScript(s).then(function(){scripts=scripts.filter(function(x){return x.id!==s.id});if(after)after();toast('Script deleted');refreshLists()}).catch(fail);
 }
@@ -246,35 +285,8 @@ function refreshLists(){
 }
 
 /* ---------- Home ---------- */
-function renderHome(){
-  var latest=vis().slice().sort(function(a,b){return b.created-a.created}).slice(0,3);
-  $('#latest').innerHTML=latest.length?latest.map(cardHTML).join(''):'<div class="empty"><h3>No scripts yet</h3><p>Publish your first script to see it here.</p></div>';
-}
-var SNIPS=[
- {n:'debounce.js',l:'javascript',t:"function debounce(fn, wait = 250) {\n  let timer;\n  return (...args) => {\n    clearTimeout(timer);\n    timer = setTimeout(() => fn(...args), wait);\n  };\n}\n\n// Publish it. Edit it. Download it.\nexport default debounce;"},
- {n:'backup.sh',l:'bash',t:"#!/usr/bin/env bash\nset -euo pipefail\n\nSTAMP=$(date +%Y%m%d)\ntar -czf \"backup-$STAMP.tar.gz\" ./src\n\n# Stored on your device only\necho \"Archive ready\""},
- {n:'greet.py',l:'python',t:"def greet(name: str) -> str:\n    return f\"Hello, {name}\"\n\nfor person in [\"Ada\", \"Linus\", \"Grace\"]:\n    print(greet(person))\n\n# Scripts worth keeping"}
-];
-(function typer(){
-  var body=$('#termBody'),i=0,pos=0;
-  function show(txt,caret){
-    body.innerHTML=highlight(txt,SNIPS[i].l)+(caret?'<span class="caret"></span>':'');
-    $('#termMeta').textContent=fmtSize(byteLen(txt))+' · '+lineCount(txt)+' lines';
-  }
-  function head(){$('#termName').textContent=SNIPS[i].n;$('#termLang').textContent=langLabel(SNIPS[i].l)}
-  head();
-  if(reduce){show(SNIPS[0].t,false);return}
-  function tick(){
-    if(current!=='home'||document.hidden){setTimeout(tick,600);return}
-    var s=SNIPS[i].t;
-    if(pos<=s.length){show(s.slice(0,pos),true);pos++;setTimeout(tick,pos%7===0?55:20)}
-    else{
-      show(s,false);var f=$('#fakeDl');f.classList.remove('pulse');void f.offsetWidth;f.classList.add('pulse');
-      setTimeout(function(){pos=0;i=(i+1)%SNIPS.length;head();tick()},2800);
-    }
-  }
-  setTimeout(tick,800);
-})();
+function renderHome(){if(window.AevyHome)AevyHome.render()}
+
 
 /* ---------- Scripts view ---------- */
 var filter='all';
@@ -294,6 +306,10 @@ function renderScripts(){
     if(sort==='az')return a.title.localeCompare(b.title);
     if(sort==='old')return a.created-b.created;
     if(sort==='upd')return b.updated-a.updated;
+    if(sort==='dl')return (b.downloads||0)-(a.downloads||0)||b.created-a.created;
+    if(sort==='views')return (b.views||0)-(a.views||0)||b.created-a.created;
+    if(sort==='likes')return (b.likes||0)-(a.likes||0)||b.created-a.created;
+    if(sort==='rated')return (b.rcount?b.rsum/b.rcount:0)-(a.rcount?a.rsum/a.rcount:0)||b.rcount-a.rcount;
     return b.created-a.created;
   });
   $('#cards').innerHTML=list.length?list.map(cardHTML).join(''):'<div class="empty"><h3>'+(vis().length?'Nothing matches':'Your library is empty')+'</h3><p>'+(vis().length?'Try a different search or language.':'Publish a script to get started.')+'</p></div>';
@@ -433,6 +449,7 @@ function openScript(id,edit){
   var body=$('#dlgBody');
   body.innerHTML='<p class="note">Loading file...</p>';
   if(!dlg.open){dlg.showModal();document.body.classList.add('lock')}
+  if(window.AevyStats)AevyStats.view(s);
   DB.getCode(s).then(function(code){
     if(openId!==id)return;
     renderScriptBody(s,code,edit);body.scrollTop=0;
@@ -464,11 +481,13 @@ function renderScriptBody(s,code,edit){
     var v=parseVideo(s.video);
     body.innerHTML=
       '<div class="dlg-bar"><button class="btn btn-primary btn-lg" data-a="download">'+ICON.dl+'Download '+esc(fileNameOf(s))+'</button>'+
-        (isOwner(s)?'<button class="btn btn-lg" data-a="edit">Edit</button>':'')+'<button class="btn btn-lg" data-a="copy">Copy</button><button class="btn btn-lg" data-a="fork">Fork</button>'+(isOwner(s)?'<button class="btn btn-lg btn-danger" data-a="delete">Delete</button>':'')+'</div>'+
+        (isOwner(s)?'<button class="btn btn-lg" data-a="edit">Edit</button>':'')+'<button class="btn btn-lg" data-a="copy">Copy</button><button class="btn btn-lg" data-a="fork">Fork</button>'+((isOwner(s)||(window.AevyAuth.isAdmin&&AevyAuth.isAdmin()))?'<button class="btn btn-lg btn-danger" data-a="delete">Delete</button>':'')+'</div>'+
       (s.desc?'<p class="desc">'+esc(s.desc)+'</p>':'')+
       ((s.tags&&s.tags.length)?'<div class="tags">'+s.tags.map(function(t){return '<span class="tag">'+esc(t)+'</span>'}).join('')+'</div>':'')+
       (v?'<div>'+playerHTML(v)+'</div>':'')+
-      (BIN.isBin(code)?'<div class="notice">Binary or encrypted file ('+fmtSize(s.size||0)+'). It cannot be shown as text. Use Download to get the original file.</div>':codeHTML(code,s.lang));
+      (BIN.isBin(code)?'<div class="notice">Binary or encrypted file ('+fmtSize(s.size||0)+'). It cannot be shown as text. Use Download to get the original file.</div>':codeHTML(code,s.lang))+
+      '<div id="social"></div>';
+    if(window.AevyStats)AevyStats.mount(s);
   }
 }
 $('#dlgBody').addEventListener('click',function(e){
@@ -632,7 +651,11 @@ window.AevyCore={all:function(){return scripts},vis:vis,mine:mine,cats:CATS,card
   localCount:function(){return oldScripts().length},importLocal:importLocal,
   purgeFiles:function(){return DB.purgeMyFiles()},
   dropOwner:function(id){scripts=scripts.filter(function(s){return s.owner!==id});videos=[]},
-  refresh:function(){current='';route()}};
+  refresh:function(){current='';route()},
+  /* live updates pushed by AevyStats (realtime) */
+  upsert:function(s){upsertLocal(s);refreshLists()},
+  drop:function(id){var n=scripts.length;scripts=scripts.filter(function(x){return x.id!==id});if(scripts.length!==n)refreshLists()},
+  byId:byId,view:function(){return current},isOwner:isOwner};
 /* ---------- Init ---------- */
 document.addEventListener('DOMContentLoaded',function(){
   var boot=$('#boot');

@@ -14,7 +14,8 @@ var profiles=[],index={},user=null,me=null,silent=0,recovering=false,booted=fals
 var HOME=location.origin+location.pathname;
 
 function ms(t){var n=t?Date.parse(t):NaN;return isNaN(n)?Date.now():n}
-function pub(p){return {id:p.id,username:p.username,name:p.name,bio:p.bio||'',color:p.color,created:ms(p.created)}}
+function pub(p){return {id:p.id,username:p.username,name:p.name,bio:p.bio||'',color:p.color,avatar:p.avatar||'',cover:p.cover||'',location:p.location||'',website:p.website||'',role:p.role==='admin'?'admin':'user',verified:!!p.verified,created:ms(p.created)}}
+var PCOLS='id,username,name,bio,color,avatar,cover,location,website,role,verified,created';
 function reindex(){index={};profiles.forEach(function(p){index[p.id]=p})}
 function hash(s){var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h)}
 function aevy(msg,extra){var e=new Error(msg);e.aevy=1;if(extra)for(var k in extra)e[k]=extra[k];return e}
@@ -41,8 +42,16 @@ function nice(e){
   return new Error(m||'Request failed');
 }
 function must(r){if(r.error)throw r.error;return r.data}
+var PBASE='id,username,name,bio,color,avatar,cover,location,website,created';
 function loadProfiles(){
-  return sb.from('profiles').select('id,username,name,bio,color,created').order('created',{ascending:true}).limit(1000).then(function(r){
+  return sb.from('profiles').select(PCOLS).order('created',{ascending:true}).limit(1000).then(function(r){
+    /* the badge columns (role, verified) are missing until the latest schema.sql is run: fall back so the site keeps working */
+    if(r.error&&(r.error.code==='42703'||/role|verified/i.test(r.error.message||''))){
+      console.warn('Run the latest supabase/schema.sql to enable badges');
+      return sb.from('profiles').select(PBASE).order('created',{ascending:true}).limit(1000);
+    }
+    return r;
+  }).then(function(r){
     profiles=must(r).map(pub);reindex();
   });
 }
@@ -52,6 +61,7 @@ function ensureProfile(){return index[user.id]?Promise.resolve():loadProfiles()}
 var A=window.AevyAuth={
   ready:null,
   current:function(){return me},
+  isAdmin:function(){return !!(me&&me.role==='admin')},
   email:function(){return user?user.email:''},
   recovery:function(){return recovering},
   byName:function(n){var k=String(n).toLowerCase();return profiles.filter(function(u){return u.username===k})[0]},
@@ -155,9 +165,44 @@ var A=window.AevyAuth={
     if(p.name!=null)f.name=String(p.name).trim().slice(0,40)||me.name;
     if(p.bio!=null)f.bio=String(p.bio).slice(0,280);
     if(p.color)f.color=p.color;
-    return sb.from('profiles').update(f).eq('id',me.id).select('id,username,name,bio,color,created').single().then(must).then(function(d){
+    if(p.location!=null)f.location=String(p.location).trim().slice(0,40);
+    if(p.website!=null){
+      var w=String(p.website).trim();
+      if(w&&!/^https?:\/\//i.test(w))w='https://'+w;
+      if(w&&!/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(w))return Promise.reject(new Error('Enter a valid website address'));
+      f.website=w.slice(0,100);
+    }
+    if(p.avatar!=null)f.avatar=p.avatar;
+    if(p.cover!=null)f.cover=p.cover;
+    return sb.from('profiles').update(f).eq('id',me.id).select(PCOLS).single().then(must).then(function(d){
       var n=pub(d);profiles=profiles.map(function(u){return u.id===n.id?n:u});reindex();me=n;return n;
     }).then(null,function(e){throw nice(e)});
+  },
+  /* Uploads a profile photo ('avatar') or cover photo ('cover') to Storage and saves its address on the profile. */
+  setImage:function(kind,blob){
+    if(!me)return Promise.reject(new Error('Sign in first'));
+    if(kind!=='avatar'&&kind!=='cover')return Promise.reject(new Error('Unknown image'));
+    var path=me.id+'/'+kind+'.jpg';
+    return sb.storage.from('avatars').upload(path,blob,{upsert:true,contentType:'image/jpeg',cacheControl:'3600'}).then(function(r){
+      if(r.error)throw r.error;
+      var url=sb.storage.from('avatars').getPublicUrl(path).data.publicUrl+'?v='+Date.now();
+      var o={};o[kind]=url;return A.update(o);
+    }).then(null,function(e){
+      var m=String((e&&e.message)||e);
+      if(/bucket not found/i.test(m))throw new Error('Photo storage is not set up. Run the latest supabase/schema.sql in the Supabase SQL editor');
+      if(/row-level security|not authorized|unauthorized/i.test(m))throw new Error('Not allowed to upload. Run the latest supabase/schema.sql in the Supabase SQL editor');
+      throw nice(e);
+    });
+  },
+  removeImage:function(kind){
+    if(!me)return Promise.reject(new Error('Sign in first'));
+    var o={};o[kind]='';
+    return A.update(o).then(function(n){sb.storage.from('avatars').remove([me.id+'/'+kind+'.jpg']).then(function(){},function(){});return n});
+  },
+  /* deletes every photo of the signed-in user (used before account deletion, best effort) */
+  purgeImages:function(){
+    if(!me)return Promise.resolve();
+    return sb.storage.from('avatars').remove([me.id+'/avatar.jpg',me.id+'/cover.jpg']).then(function(){},function(){});
   },
   /* re-checks the password by signing in again */
   verify:function(pw,msg){

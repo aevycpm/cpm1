@@ -6,8 +6,10 @@ Project: https://jjtgwzyupfqfnbkntkep.supabase.co  (settings are in js/config.js
 Setup (about 5 minutes, one time)
 ---------------------------------
 1. Supabase dashboard -> SQL Editor -> New query -> paste the whole of supabase/schema.sql -> Run.
-   This creates the tables, the Row Level Security policies, the profile trigger and the
-   delete-account function. It is safe to run again. Without it every request fails.
+   This creates the tables, the Row Level Security policies, the profile trigger, the
+   delete-account function, the download/view/visitor counters, likes, reviews and the Realtime
+   setup. It is safe to run again (run it again now if you already had an older version).
+   Without it every request fails.
 2. Authentication -> Sign In / Providers -> Email: enabled.
    Recommended: turn OFF "Confirm email" so new accounts can sign in at once.
    (With it ON everything still works: the user must click the emailed link before signing in.)
@@ -28,10 +30,12 @@ Security (supabase/schema.sql), not by hiding the key. Never put a secret / serv
 What lives where
 ----------------
 Accounts        Supabase Auth (auth.users: email + password, hashed by Supabase) and Google
-Profiles        table public.profiles      (public: username, name, bio, colour; username is unique)
+Profiles        table public.profiles      (public: username, name, bio, location, website, photo + cover address; username is unique)
+Profile photos  Storage bucket "avatars" (public read; each user can write only inside their own folder <user id>/)
 Scripts         table public.scripts       (title, language, category, visibility, preview...)
 Script files    table public.script_files  (the file content, max 2 MB per script; any file type)
 Saved videos    table public.videos        (private to each user)
+Community       tables public.script_likes, public.script_comments (likes, reviews), public.daily_stats (visitors/views/downloads per day)
 Browser         only the colour theme stays in localStorage; Supabase keeps the login session.
 
 Ownership and privacy (enforced by Row Level Security, not just the UI)
@@ -48,20 +52,104 @@ If the browser still holds scripts from the old local version, the Profile page 
 "Upload to your account" button. Data from the previous Firebase project is NOT migrated
 automatically (different database); download your scripts from the old site first if you need them.
 
-AI assistant ("Ask AI" button, bottom-right corner)
----------------------------------------------------
-The chat works out of the box in "Offline helper" mode (answers common questions about the site).
-For live AI answers, deploy the included Supabase Edge Function once (needs the Supabase CLI):
-   supabase login
-   supabase link --project-ref jjtgwzyupfqfnbkntkep
-   supabase secrets set ANTHROPIC_API_KEY=sk-ant-xxxxxxxx
-   supabase functions deploy aevy-chat --no-verify-jwt
-Optional: supabase secrets set ALLOWED_ORIGIN=https://your-site   (only your site may call it)
-The AI key lives only in Supabase secrets, never in the website. The function limits message length
-and rate (20 messages/min per IP); watch your Anthropic usage because the endpoint is public.
-Edit the personality / site knowledge in supabase/functions/aevy-chat/index.ts (SYSTEM text).
-The panel header shows "Live" when the function answers, "Offline helper" when it does not.
-Model: defaults to claude-sonnet-5-5; set another with: supabase secrets set AEVY_CHAT_MODEL=claude-haiku-5-5 (cheaper, faster).
+Profiles (new)
+--------------
+Each user has a profile page like Facebook / Instagram: cover photo, round profile photo, name, @username, bio,
+location, website, join date and counts (scripts, downloads, likes, average rating), with their scripts below.
+- Your own page is #/profile (click your photo or name at the top right): change the profile photo with the camera
+  button, add or remove a cover photo, and edit name, bio, location and website.
+- Everyone's page is #/u/<username> (click an author name on a script).
+- Photos are resized in the browser (profile 400x400, cover 1500x500, JPEG) before upload, so they stay small.
+- Needs the latest supabase/schema.sql (new profile columns + the "avatars" Storage bucket and its policies).
+- The Publishers list page and the AI assistant were removed.
+
+Live statistics, likes and reviews (new)
+----------------------------------------
+Everything below updates in every open browser instantly (Supabase Realtime), no refresh.
+- Download counter     every script card and script page shows downloads, views, likes and the star average.
+                       Every download counts (a .zip counts each script inside it).
+- Views                counted once per visitor, per script, per day (a page refresh is not a new view).
+- "Live today" bar     Visitors today, script views today, downloads today, downloads all time. Shown on Home and
+                       Scripts. A visitor is a random anonymous id kept in the browser, counted once per day.
+- Likes                signed-in users like / unlike on the script page. One like per user per script.
+- Reviews & comments   signed-in users can post a comment and optionally a 1-5 star review (one review per user per
+                       script, not on your own script). The author or the script's publisher can delete a comment.
+- Community page       #/community: live activity feed (new scripts, reviews, comments, likes), most downloaded and
+                       top rated lists, and a "Post a script" button.
+- Sorting              Scripts page can sort by Most downloaded / Most viewed / Most liked / Top rated.
+Security: the counters cannot be forged from the browser. Only the SQL functions in schema.sql change them
+(an owner editing their own script cannot reset or raise them). Private scripts are never counted publicly or
+shown in the community feed.
+"Today" uses the Asia/Dhaka time zone. To change it, edit the aevy_today() function near the end of schema.sql.
+If Realtime does not update: Supabase dashboard -> Database -> Replication / Publications -> supabase_realtime
+and make sure scripts, script_comments, script_likes and daily_stats are enabled (schema.sql does this for you).
+
+Badges and ranks (new)
+----------------------
+- Blue Verified check   a user who has published 2 or more PUBLIC scripts gets it automatically (database triggers,
+                        so it cannot be faked from the browser). It is removed again if they drop below 2.
+- Admin rank            red "Admin" badge (Admins are always verified). Only you can grant it, in the Supabase SQL editor:
+                            update public.profiles set role = 'admin' where username = 'your_username';
+                        Admins can delete any public script or comment (moderation). They cannot edit other people's
+                        scripts and cannot read private scripts.
+- New badge             green "New" badge on accounts younger than 7 days. Older accounts show no badge.
+- Shown next to the name on script cards, profile pages, comments, the activity feed and the top-right user chip.
+- Settings (schema.sql): aevy_verify_scripts() = 2 scripts, aevy_new_user_days() = 7 days. If you change the days,
+  also change newDays in js/config.js so the site and the database agree.
+- Run the new supabase/schema.sql again: it adds profiles.role + profiles.verified, the triggers, the profile_badges
+  view, the admin policies, and back-fills existing users.
+
+Social: follow, messages, online status (new)
+---------------------------------------------
+- Follow / Following   on every profile (#/u/<username>): Follow button, live Followers / Following counts, click a count
+                       to see the list. You cannot follow yourself.
+- Messages             #/messages (also the "Messages" link in the top bar, with an unread counter). Press Message on a
+                       profile or search a name in the left panel. Messages arrive instantly (Realtime), show "Seen",
+                       and you can Unsend your own. Only the sender and the recipient can read a message (Row Level
+                       Security). Limit: 2000 characters, 30 messages per minute. The newest 500 messages load at
+                       once; opening a chat loads up to 200 more of that conversation.
+- Online / offline     the open site sends a heartbeat every 45 s. Online = seen in the last 2.5 min; otherwise
+                       "Last seen ...". Shown as a green ring on the profile photo and a line under the username,
+                       and in the chat header. Users can switch it off with "Show my online status" in Messages;
+                       hidden users show neither online nor last seen.
+- Setup                run the latest supabase/schema.sql again (adds follows, messages, presence, mark_read(),
+                       touch_presence(), get_presence() and Realtime for messages + follows).
+- Not included yet     blocking users, group chats, image/file messages, push notifications.
+
+Home page (new: social feed)
+----------------------------
+The marketing hero, feature grid and animated demo were removed. Home (js/home.js) is now a 3-column social layout:
+- Left     your card (photo, name, badges, scripts / followers / following) and shortcuts; a sign-in card when signed out.
+- Centre   "Share a script" box, then the feed with tabs: Latest, Trending (likes, downloads, views of recent scripts)
+           and Following (only people you follow). Each post has Like, Review, Copy and Download.
+- Right    Live today counters, Who to follow (with Follow buttons) and Online now.
+On phones it becomes one column. No database change is needed for the home page.
+(The old home styles are still in css/style.css but unused; they are safe to delete.)
+
+Community (new: social feed, #/community)
+------------------------------------------
+- Post box: write an update, question or tip (up to 1000 characters) and optionally attach one of your public scripts.
+  Use @username to mention someone (becomes a link to their profile).
+- Feed tabs: All, Following (people you follow), Discussions (text posts only), Scripts (new scripts only).
+  New scripts are mixed into the feed automatically, with the normal Like / Review / Copy / Download buttons.
+- Like and comment on posts. Comments open under the post. The commenter, the post's author and Admins can delete a
+  comment; the author and Admins can delete a post. Limits: 10 posts and 20 comments per minute per user.
+- Live: new posts, like counts and comments appear without a refresh (Supabase Realtime).
+- Side column: Who to follow, Online now, Most downloaded.
+- Setup: run the latest supabase/schema.sql again (adds posts, post_likes, post_comments, their policies and triggers).
+  Until then the page shows a "not set up yet" message. The old live-activity list was replaced by this feed.
+
+Profile (new design: #/profile and #/u/<username>)
+--------------------------------------------------
+- Header card: cover, large photo, name with badges, @username, online status, Follow / Message (or Edit profile) and
+  Share (copies the profile link). Stat tiles: scripts, downloads, likes, rating, followers, following.
+- Tabs: Scripts (search, Publish button), Posts (that member's Community posts, with like and comment),
+  About, and Settings (own profile only).
+- Edit profile opens a small dialog (name, bio, location, website, change photo / cover): no long forms on the page.
+- Side card: bio, location, website, join date, Verified / Admin note. Your own page also shows a
+  "Complete your profile" checklist with one-click add buttons.
+- Settings (own): online-status switch, change password, delete account.
+- No database change is needed for the profile design.
 
 Look and feel
 -------------
