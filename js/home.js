@@ -46,7 +46,7 @@ function paintFeed(){
 
 function leftCard(){
   var m=me();
-  if(!m)return '<div class="hs-card hs-welcome"><h3>Welcome to Aevy</h3><p>Share scripts, follow creators and chat with the community.</p><a class="btn btn-primary" href="#/auth">Sign in or create account</a></div>';
+  if(!m)return '';   /* signed out: no welcome card, the feed starts straight away */
   return '<a class="hs-card hs-me" href="#/profile"><span class="hs-cover" style="--c:'+esc(m.color)+'"></span><span class="hs-av">'+av(m,64)+'</span>'+
    '<b>'+esc(m.name)+badge(m)+'</b><small>@'+esc(m.username)+'</small>'+
    '<span class="hs-nums"><span><b id="hsScripts">'+C.mine().length+'</b>Scripts</span><span><b id="hsFollowers">-</b>Followers</span><span><b id="hsFollowing">-</b>Following</span></span></a>';
@@ -67,7 +67,7 @@ function suggestHTML(){
   if(!us.length)return '<p class="hs-empty">No suggestions right now.</p>';
   return us.map(function(u){
     return '<div class="hs-row"><a class="hs-who" href="#/u/'+esc(u.username)+'">'+av(u,38)+'<span><b>'+esc(u.name)+badge(u)+'</b><small>@'+esc(u.username)+' &middot; '+(count[u.id]||0)+' scripts</small></span></a>'+
-      (m&&S()?S().followBtn(u.id):'<a class="btn btn-sm" href="#/auth">Follow</a>')+'</div>';
+      (m&&S()?S().followBtn(u.id):'<a class="fbtn" href="#/auth">Follow</a>')+'</div>';
   }).join('');
 }
 function onlineHTML(){
@@ -83,7 +83,8 @@ function rightCol(){
 }
 function render(){
   var root=$('#homeRoot');if(!root)return;
-  root.innerHTML='<aside class="hs-left">'+leftCard()+nav()+'</aside>'+
+  root.classList.toggle('guest',!me());
+  root.innerHTML=(me()?'<aside class="hs-left">'+leftCard()+nav()+'</aside>':'')+
    '<main class="hs-mid">'+composer()+
    '<div class="hs-tabs" id="homeTabs" role="tablist"><button type="button" data-tab="latest" role="tab">Latest</button><button type="button" data-tab="trending" role="tab">Trending</button><button type="button" data-tab="following" role="tab">Following</button></div>'+
    '<div class="feed-list" id="homeFeed"></div></main>'+

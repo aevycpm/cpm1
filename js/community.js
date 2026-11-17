@@ -83,11 +83,11 @@ function postHTML(p){
 function cmtPanel(p){
   var list=cmts[p.id],m=me();
   return '<div class="cpanel"><ul class="cl">'+(list?(list.length?list.map(function(c){return cmtHTML(c,p)}).join(''):'<li class="cempty">No comments yet. Be the first.</li>'):'<li class="cempty">Loading...</li>')+'</ul>'+
-   (m?'<div class="cform">'+av(m,30)+'<input class="field" data-cin="'+esc(p.id)+'" maxlength="500" placeholder="Write a comment..." autocomplete="off"><button class="btn btn-sm btn-primary" type="button" data-csend="'+esc(p.id)+'">Send</button></div>':'<p class="cempty"><a href="#/auth"><u>Sign in</u></a> to comment.</p>')+'</div>';
+   (m?'<div class="cform">'+av(m,34)+'<input class="field" data-cin="'+esc(p.id)+'" maxlength="500" placeholder="Write a comment..." autocomplete="off"><button class="btn btn-sm btn-primary" type="button" data-csend="'+esc(p.id)+'">Send</button></div>':'<p class="cempty"><a href="#/auth"><u>Sign in</u></a> to comment.</p>')+'</div>';
 }
 function cmtHTML(c,p){
   var u=A.byId(c.owner),m=me(),can=m&&(c.owner===m.id||p.owner===m.id||isAdmin());
-  return '<li class="cm" data-cid="'+esc(c.id)+'">'+(u?av(u,30):'')+'<div class="cm-b"><div class="cm-h">'+nameOf(u)+'<time>'+ago(c.t)+'</time>'+(can?'<button class="cdel" type="button" data-cdel="'+esc(c.id)+'" data-p="'+esc(p.id)+'">Delete</button>':'')+'</div><p>'+rich(c.body)+'</p></div></li>';
+  return '<li class="cm" data-cid="'+esc(c.id)+'">'+(u?av(u,34):'')+'<div class="cm-b"><div class="cm-h">'+nameOf(u)+'<time>'+ago(c.t)+'</time>'+(can?'<button class="cdel" type="button" data-cdel="'+esc(c.id)+'" data-p="'+esc(p.id)+'">Delete</button>':'')+'</div><p>'+rich(c.body)+'</p></div></li>';
 }
 function paintFeed(){
   var box=$('#csFeed');if(!box)return;

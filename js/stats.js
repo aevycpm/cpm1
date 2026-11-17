@@ -146,18 +146,18 @@ function composer(){
   var s=openS,m=A.current(),box=$('#socForm');if(!box)return;
   if(!m){box.innerHTML='<p class="note nm"><a href="#/auth" data-close><u>Sign in</u></a> to like, review and comment.</p>';return}
   var own=C.isOwner(s),canRate=!own&&!mineReview();
-  box.innerHTML='<form id="cForm" class="cform">'+
-   (canRate?'<div class="rate" role="radiogroup" aria-label="Your rating">'+[1,2,3,4,5].map(function(i){return '<button type="button" class="rt" role="radio" aria-checked="false" data-r="'+i+'" aria-label="'+i+' star'+(i>1?'s':'')+'">'+I.star.replace(/width="14" height="14"/,'width="22" height="22"')+'</button>'}).join('')+'<span class="rhint" id="rHint">Tap stars to leave a review</span></div>':
-    '<p class="note nm">'+(own?'You can reply to your community, but not rate your own script.':'You already reviewed this script. You can still comment.')+'</p>')+
-   '<textarea class="field" id="cBody" maxlength="600" rows="2" placeholder="'+(canRate?'Write a review or a comment':'Write a comment')+'"></textarea>'+
-   '<div class="crow"><span class="note nm" id="cCount">0 / 600</span><span class="ferr" id="cErr" role="alert"></span><button class="btn btn-primary" type="submit">Post</button></div></form>';
+  box.innerHTML='<form id="cForm" class="cmp">'+avatar(m,38)+'<div class="cmp-main">'+
+   (canRate?'<div class="rate" role="radiogroup" aria-label="Your rating">'+[1,2,3,4,5].map(function(i){return '<button type="button" class="rt" role="radio" aria-checked="false" data-r="'+i+'" aria-label="'+i+' star'+(i>1?'s':'')+'">'+I.star.replace(/width="14" height="14"/,'width="20" height="20"')+'</button>'}).join('')+'<span class="rhint" id="rHint">Rate this script (optional)</span></div>':
+    '<p class="cmp-note">'+(own?'You can reply to your community, but not rate your own script.':'You already reviewed this script. You can still comment.')+'</p>')+
+   '<textarea class="field" id="cBody" maxlength="600" rows="2" placeholder="'+(canRate?'Share your experience with this script...':'Add a comment...')+'"></textarea>'+
+   '<div class="crow"><span class="cmp-count" id="cCount">0 / 600</span><span class="ferr" id="cErr" role="alert"></span><button class="btn btn-primary btn-sm" type="submit">Post</button></div></div></form>';
   pickRating=0;
   var f=$('#cForm');
   $('#cBody').oninput=function(){$('#cCount').textContent=this.value.length+' / 600'};
   $$('.rt',f).forEach(function(b){b.onclick=function(){
     pickRating=pickRating===+b.dataset.r?0:+b.dataset.r;
     $$('.rt',f).forEach(function(x){var on=+x.dataset.r<=pickRating;x.classList.toggle('on',on);x.setAttribute('aria-checked',+x.dataset.r===pickRating)});
-    $('#rHint').textContent=pickRating?['','Poor','Fair','Good','Very good','Excellent'][pickRating]:'Tap stars to leave a review';
+    $('#rHint').textContent=pickRating?['','Poor','Fair','Good','Very good','Excellent'][pickRating]:'Rate this script (optional)';
   }});
   f.onsubmit=function(e){
     e.preventDefault();
@@ -174,15 +174,16 @@ function composer(){
 }
 function commentHTML(c,fresh){
   var u=who(c.owner),m=A.current(),canDel=m&&(c.owner===m.id||A.isAdmin()||(openS&&C.isOwner(openS)));
-  return '<li class="cmt'+(fresh?' fresh':'')+'" data-cid="'+esc(c.id)+'">'+avatar(u,34)+
-   '<div class="cbody"><div class="ch">'+(u?'<a href="#/u/'+esc(u.username)+'" data-close>'+esc(u.name)+'</a>'+(window.AevyBadge?AevyBadge.html(u):'')+'<span class="un">@'+esc(u.username)+'</span>':'<span>Member</span>')+
-   (c.rating?stars(c.rating)+'<span class="badge">Review</span>':'')+'<time>'+ago(c.t)+'</time>'+(canDel?'<button class="cdel" data-del="'+esc(c.id)+'" aria-label="Delete">'+'Delete'+'</button>':'')+'</div>'+
+  return '<li class="cmt'+(fresh?' fresh':'')+'" data-cid="'+esc(c.id)+'">'+avatar(u,40)+
+   '<div class="cbody"><div class="ch">'+(u?'<a class="cn" href="#/u/'+esc(u.username)+'" data-close>'+esc(u.name)+'</a>'+(window.AevyBadge?AevyBadge.html(u):''):'<span class="cn">Member</span>')+
+   '<time>'+ago(c.t)+'</time>'+(canDel?'<button class="cdel" data-del="'+esc(c.id)+'" aria-label="Delete">Delete</button>':'')+'</div>'+
+   (c.rating?'<div class="cr">'+stars(c.rating)+'<span class="badge">Review</span></div>':'')+
    '<p>'+esc(c.body)+'</p></div></li>';
 }
 function paintComments(){
   var ul=$('#cList');if(!ul)return;
-  $('#cTitle').textContent=comments.length?comments.length+' review'+(comments.length===1?'':'s')+' and comment'+(comments.length===1?'':'s'):'Reviews and comments';
-  ul.innerHTML=comments.length?comments.map(function(c){return commentHTML(c)}).join(''):'<li class="cempty">No reviews yet. Be the first to review this script.</li>';
+  $('#cTitle').textContent=comments.length?comments.length+(comments.length===1?' comment':' comments'):'Comments';
+  ul.innerHTML=comments.length?comments.map(function(c){return commentHTML(c)}).join(''):'<li class="cempty">No reviews yet. Be the first to share your thoughts.</li>';
 }
 function addComment(c,fresh){
   if(!openS||c.script_id!==openS.id)return;
@@ -194,7 +195,7 @@ function addComment(c,fresh){
   var li=document.createElement('div');li.innerHTML=commentHTML(c,true);
   var idx=comments.indexOf(c),ref=ul.children[idx];
   if(ref)ul.insertBefore(li.firstChild,ref);else ul.appendChild(li.firstChild);
-  $('#cTitle').textContent=comments.length+' review'+(comments.length===1?'':'s')+' and comment'+(comments.length===1?'':'s');
+  $('#cTitle').textContent=comments.length+(comments.length===1?' comment':' comments');
   if(!who(c.owner))A.refreshProfiles().then(paintComments);
 }
 function removeComment(id){
@@ -205,7 +206,7 @@ function mount(s){
   var box=$('#social');if(!box)return;
   openS=s;comments=[];
   box.innerHTML='<section class="social"><div class="soc-bar" id="socBar"></div>'+
-   '<div class="soc-head"><h3 id="cTitle">Reviews and comments</h3><span class="live-tag sm"><span class="live-dot"></span>Live</span></div>'+
+   '<div class="soc-head"><h3 id="cTitle">Comments</h3><span class="live-tag sm"><span class="live-dot"></span>Live</span></div>'+
    '<div id="socForm"></div><ul class="cmts" id="cList"><li class="cempty">Loading...</li></ul></section>';
   paintSocialBar();composer();
   SB.from('script_comments').select('*').eq('script_id',s.id).order('created',{ascending:false}).limit(100).then(function(r){

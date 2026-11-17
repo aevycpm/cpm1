@@ -177,3 +177,23 @@ Notes
 - Password reset: "Forgot password?" emails a reset link (email accounts) or texts a 6-digit code (phone accounts); either way the site then asks for a new password.
 - Libraries load up to 1000 public scripts / profiles. Add pagination if you grow past that.
 - supabase-js 2.117.3 is loaded from cdn.jsdelivr.net, so the site needs internet.
+
+
+Messaging (rebuilt)
+-------------------
+- Message icon in the header with a live unread count. Click it for a popup inbox: search people, All / Unread tabs,
+  newest conversations first.
+- Choosing a conversation opens a pop-up chat window at the bottom right (up to 3 side by side, minimise / close /
+  open in full page). On phones it opens the full Messages page instead.
+- Messages page: conversation list on the left, chat on the right. Day separators, grouped bubbles, clickable links,
+  Delivered / Seen receipts that update live, typing indicator, Unsend, failed-send Retry, and an online-status switch.
+- New messages show a notification card (click to reply) and the browser tab title shows (n) unread.
+- The profile "Message" button opens the pop-up chat. No database change is needed; the existing schema.sql is enough.
+
+Discover card for new visitors (new)
+------------------------------------
+A new visitor sees, a few seconds after the site loads, a small card with up to 3 random PUBLIC scripts from other
+members. Each one has a Download button, a title that opens the script page, and "Show different scripts".
+- Nothing downloads by itself: the visitor must press Download (downloads are counted as usual).
+- Shown once per browser (localStorage key aevy.discover.v1). Never shows private scripts or the visitor's own scripts.
+- Turn off: set  discover: false  in js/config.js.  Code: js/discover.js
