@@ -14,37 +14,63 @@ function avatar(u,sz){
 function err(box,e){box.textContent=e.message||String(e)}
 function changed(){window.dispatchEvent(new Event('aevy:auth'))}
 
-var G='<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>';
 var EYE='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 function pw(id,label,ac,extra){return '<div><label class="l" for="'+id+'">'+label+'</label><div class="pwrap"><input class="field" id="'+id+'" type="password" autocomplete="'+ac+'" required '+(extra||'')+'><button type="button" class="eye" data-eye="'+id+'" aria-label="Show password">'+EYE+'</button></div></div>'}
+/* email-or-phone field: a country-code picker appears (auto-detected, changeable) as soon as a phone number is typed */
+function idf(id,hint){return '<div class="idrow"><label class="cc" hidden><span class="cc-l" aria-hidden="true"></span><select class="cc-s" aria-label="Country code"></select></label>'+
+  '<input class="field" id="'+id+'" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" required placeholder="Email or phone number"></div><p class="hint idp" data-for="'+id+'" data-hint="'+hint+'">'+hint+'</p>'}
 mk('auth','<div class="auth-shell"><aside class="auth-side"><span></span>'+
  '<div><p class="eyebrow">CPM script ecosystem</p><h1 id="aTitle">Welcome back.</h1><p class="auth-lead" id="aLead">Sign in to publish scripts, manage your files and keep your private work private.</p></div>'+
- '<ul class="auth-points"><li><b>Own your uploads</b><span>Only you can edit or delete what you publish.</span></li><li><b>Public or private</b><span>Choose who can see each script.</span></li><li><b>Free to join</b><span>No card, no spam. Your email stays private.</span></li></ul></aside>'+
+ '<ul class="auth-points"><li><b>Own your uploads</b><span>Only you can edit or delete what you publish.</span></li><li><b>Public or private</b><span>Choose who can see each script.</span></li><li><b>Free to join</b><span>No card, no spam. Your email or phone stays private.</span></li></ul></aside>'+
  '<div class="auth-main"><div class="auth-card">'+
  '<div id="stChoose" hidden><h2>Pick your username</h2><p class="sub2" id="stSub">One last step. Your username is your public handle.</p>'+
  '<form class="form" id="fDone"><div><label class="l" for="dN">Display name</label><input class="field" id="dN" maxlength="40" autocomplete="name"></div>'+
  '<div><label class="l" for="dU">Username</label><input class="field" id="dU" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" required placeholder="letters, numbers, _"><p class="hint" id="dH"></p></div>'+
  '<p class="ferr" role="alert"></p><button class="btn btn-primary btn-lg">Continue</button><button type="button" class="linkbtn" id="dOut">Use a different account</button></form></div>'+
- '<div id="stMain"><div class="seg" role="tablist"><button type="button" role="tab" class="on" data-t="in">Sign in</button><button type="button" role="tab" data-t="up">Create account</button></div>'+
- '<button type="button" class="btn btn-lg gbtn" id="gBtn">'+G+'<span>Continue with Google</span></button><p class="gerr ferr" role="alert"></p><div class="or"><span>or use email</span></div>'+
- '<form class="form" id="fIn"><div><label class="l" for="siE">Email</label><input class="field" id="siE" type="email" autocomplete="email" required></div>'+pw('siP','Password','current-password')+
+ '<div id="stMain"><div class="seg" role="tablist"><button type="button" role="tab" class="on" data-mode="in">Sign in</button><button type="button" role="tab" data-mode="up">Create account</button></div>'+
+ '<form class="form" id="fIn"><div><label class="l" for="siE">Email or phone number</label>'+idf('siE','Phone numbers get your country code added automatically.')+'</div>'+pw('siP','Password','current-password')+
  '<div class="rowsb"><span class="ferr" role="alert" id="inErr"></span><button type="button" class="linkbtn" id="fgt">Forgot password?</button></div><button class="btn btn-primary btn-lg">Sign in</button></form>'+
  '<form class="form" id="fUp" hidden><div><label class="l" for="suU">Username</label><input class="field" id="suU" maxlength="20" autocomplete="username" autocapitalize="off" spellcheck="false" required placeholder="letters, numbers, _"><p class="hint" id="suH"></p></div>'+
  '<div><label class="l" for="suN">Display name <small>(optional)</small></label><input class="field" id="suN" maxlength="40" autocomplete="name"></div>'+
- '<div><label class="l" for="suE">Email</label><input class="field" id="suE" type="email" autocomplete="email" required></div>'+pw('suP','Password','new-password','minlength="8"')+
+ '<div><label class="l" for="suE">Email or phone number</label>'+idf('suE','For a phone number we text you a code to confirm it.')+'</div>'+pw('suP','Password','new-password','minlength="8"')+
  '<div class="pm"><div class="pmeter" aria-hidden="true"><i></i><i></i><i></i><i></i></div><p class="hint" id="suM">Use 8 or more characters.</p></div>'+
  '<p class="ferr" role="alert" id="upErr"></p><button class="btn btn-primary btn-lg">Create account</button></form>'+
- '<p class="note">By continuing you agree to keep uploads lawful. Your email is never shown publicly.</p></div></div></div></div>');
+ '<form class="form" id="fOtp" hidden><div><label class="l" for="cdV" id="cdL">Verification code</label><input class="field" id="cdV" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required placeholder="6-digit code"></div>'+
+ '<p class="ferr" role="alert" id="cdErr"></p><button class="btn btn-primary btn-lg">Verify</button><div class="rowsb"><button type="button" class="linkbtn" id="cdBack">Back</button><button type="button" class="linkbtn" id="cdRe">Resend code</button></div></form>'+
+ '<p class="note">By continuing you agree to keep uploads lawful. Your email or phone number is never shown publicly.</p></div></div></div></div>');
 var au=$('#view-auth'),ST={mode:'in'};
+/* ---- country code picker ---- */
+var P=window.AevyPhone,IDF=[];
+function wireId(id){
+  var inp=$('#'+id),row=inp.parentNode,cc=row.querySelector('.cc'),sel=row.querySelector('.cc-s'),lab=row.querySelector('.cc-l'),pv=row.nextElementSibling;
+  if(!P){cc.remove();return}
+  sel.innerHTML=P.list.map(function(r){return '<option value="'+r[0]+'">'+P.flag(r[0])+' '+r[1]+' (+'+r[2]+')</option>'}).join('');
+  sel.value=P.detect();
+  function paint(){lab.textContent=P.flag(sel.value)+' +'+P.dial(sel.value)}
+  function upd(){
+    var v=inp.value.trim(),ph=v!==''&&!/[@A-Za-z]/.test(v);
+    cc.hidden=!ph;row.classList.toggle('ph',ph);
+    if(ph&&/^(\+|00)/.test(v)){var iso=P.matchIso(P.full(v,sel.value));if(iso)sel.value=iso}   /* typed +44... -> picker follows */
+    paint();
+    if(!ph){pv.className='hint idp';pv.textContent=v?'':pv.dataset.hint;return}
+    var f=P.full(v,sel.value),ok=P.valid(f);
+    pv.className='hint idp'+(ok?' ok':'');pv.textContent=ok?'We will use '+f:'Keep typing your number. The country code is added for you.';
+  }
+  inp.addEventListener('input',upd);
+  sel.addEventListener('change',function(){P.remember(sel.value);IDF.forEach(function(o){if(o.sel!==sel){o.sel.value=sel.value}o.upd()})});
+  IDF.push({sel:sel,upd:upd,inp:inp});upd();
+}
+/* the value to send: an email as typed, a phone number in +<code><number> form */
+function idv(id){var o=IDF.filter(function(x){return x.inp.id===id})[0];return o&&P?P.full(o.inp.value,o.sel.value):$('#'+id).value.trim()}
+wireId('siE');wireId('suE');
 function busy(f,on){var bt=f.querySelector('button:not([type=button])');if(bt){bt.disabled=on;bt.classList.toggle('loading',on)}}
 function setMode(m){
   ST.mode=m;
-  au.querySelectorAll('[data-t]').forEach(function(x){var on=x.dataset.t===m;x.classList.toggle('on',on);x.setAttribute('aria-selected',on)});
-  $('#fIn').hidden=m!=='in';$('#fUp').hidden=m!=='up';
+  au.querySelectorAll("[data-mode]").forEach(function(x){var on=x.dataset.mode===m;x.classList.toggle('on',on);x.setAttribute('aria-selected',on)});
+  $('#fIn').hidden=m!=='in';$('#fUp').hidden=m!=='up';$('#fOtp').hidden=true;au.querySelector('.seg').hidden=false;
   $('#aTitle').textContent=m==='in'?'Welcome back.':'Create your account.';
   $('#aLead').textContent=m==='in'?'Sign in to publish scripts, manage your files and keep your private work private.':'Join Aevy to publish, version and share your CPM scripts in under a minute.';
-  $('#gBtn span').textContent=m==='in'?'Continue with Google':'Sign up with Google';
-  ['.gerr','#inErr','#upErr'].forEach(function(q){au.querySelector(q).textContent=''});
+  ['#inErr','#upErr'].forEach(function(q){au.querySelector(q).textContent=''});
 }
 function renderAuth(){
   var pend=A.pending();
@@ -57,7 +83,7 @@ function renderAuth(){
     if($('#dU').value)hint($('#dU'),$('#dH'));
   }else setMode(ST.mode);
 }
-au.querySelectorAll('[data-t]').forEach(function(b){b.onclick=function(){setMode(b.dataset.t)}});
+au.querySelectorAll("[data-mode]").forEach(function(b){b.onclick=function(){setMode(b.dataset.mode)}});
 au.addEventListener('click',function(e){var b=e.target.closest('[data-eye]');if(!b)return;var i=$('#'+b.dataset.eye),sh=i.type==='password';i.type=sh?'text':'password';b.setAttribute('aria-label',sh?'Hide password':'Show password');b.classList.toggle('on',sh)});
 /* live username availability */
 var tmr;
@@ -83,10 +109,28 @@ $('#suP').oninput=function(){
 };
 function done(){ST.mode='in';changed();location.hash='#/profile'}
 function after(m){if(m)done();else{changed();renderAuth()}}
-$('#gBtn').onclick=function(){var b=this,e=au.querySelector('.gerr');e.textContent='';b.disabled=true;A.google().then(function(m){b.disabled=false;after(m)},function(x){b.disabled=false;err(e,x)})};
-$('#fgt').onclick=function(){var e=$('#inErr');e.className='ferr';A.resetPassword($('#siE').value).then(function(){e.className='ferr okmsg';e.textContent='If that email has an account, a reset link is on its way.'},function(x){e.textContent=x.message})};
-$('#fIn').onsubmit=function(e){e.preventDefault();var f=this,b=$('#inErr');b.className='ferr';b.textContent='';busy(f,true);A.signIn($('#siE').value,$('#siP').value).then(function(m){busy(f,false);f.reset();after(m)},function(x){busy(f,false);err(b,x)})};
-$('#fUp').onsubmit=function(e){e.preventDefault();var f=this,b=$('#upErr');b.textContent='';busy(f,true);A.signUp({name:$('#suN').value,email:$('#suE').value,username:$('#suU').value,password:$('#suP').value}).then(function(){busy(f,false);f.reset();$('#suH').textContent='';done()},function(x){busy(f,false);err(b,x)})};
+/* phone code step: used for sign-up confirmation (kind 'up') and for password reset (kind 'reset') */
+var CODE={phone:'',kind:'up'};
+function showCode(phone,kind,msg){
+  CODE.phone=phone;CODE.kind=kind;
+  $('#fIn').hidden=true;$('#fUp').hidden=true;$('#fOtp').hidden=false;au.querySelector('.seg').hidden=true;
+  $('#aTitle').textContent=kind==='up'?'Confirm your phone.':'Reset your password.';
+  $('#aLead').textContent='We sent a code by SMS to '+phone+'.';
+  var e=$('#cdErr');e.className=msg?'ferr okmsg':'ferr';e.textContent=msg||'';$('#cdV').value='';$('#cdV').focus();
+}
+$('#cdBack').onclick=function(){setMode(ST.mode)};
+$('#cdRe').onclick=function(){var e=$('#cdErr');e.className='ferr';e.textContent='';A.sendCode(CODE.phone,CODE.kind).then(function(){e.className='ferr okmsg';e.textContent='A new code is on its way.'},function(x){err(e,x)})};
+$('#fOtp').onsubmit=function(ev){ev.preventDefault();var f=this,b=$('#cdErr');b.className='ferr';b.textContent='';busy(f,true);
+  var up=CODE.kind==='up';
+  (up?A.verifyPhone(CODE.phone,$('#cdV').value):A.verifyReset(CODE.phone,$('#cdV').value)).then(function(){
+    busy(f,false);f.reset();
+    if(up){$('#suH').textContent='';done()}else{ST.mode='in';changed();location.hash='#/'}
+  },function(x){busy(f,false);err(b,x)})};
+$('#fgt').onclick=function(){var e=$('#inErr'),v=idv('siE');e.className='ferr';e.textContent='';
+  if(A.isPhone(v)){A.sendCode(v,'reset').then(function(p){showCode(p,'reset')},function(x){e.textContent=x.message});return}
+  A.resetPassword(v).then(function(){e.className='ferr okmsg';e.textContent='If that email has an account, a reset link is on its way.'},function(x){e.textContent=x.message})};
+$('#fIn').onsubmit=function(e){e.preventDefault();var f=this,b=$('#inErr');b.className='ferr';b.textContent='';busy(f,true);A.signIn(idv('siE'),$('#siP').value).then(function(m){busy(f,false);f.reset();after(m)},function(x){busy(f,false);err(b,x)})};
+$('#fUp').onsubmit=function(e){e.preventDefault();var f=this,b=$('#upErr');b.textContent='';busy(f,true);A.signUp({name:$('#suN').value,id:idv('suE'),username:$('#suU').value,password:$('#suP').value}).then(function(r){busy(f,false);if(r&&r.code){showCode(r.phone,'up');return}f.reset();$('#suH').textContent='';done()},function(x){busy(f,false);err(b,x)})};
 $('#fDone').onsubmit=function(e){e.preventDefault();var f=this,b=f.querySelector('.ferr');b.textContent='';busy(f,true);A.completeProfile({name:$('#dN').value,username:$('#dU').value}).then(function(){busy(f,false);done()},function(x){busy(f,false);err(b,x)})};
 $('#dOut').onclick=function(){A.signOut().then(function(){changed();renderAuth()})};
 

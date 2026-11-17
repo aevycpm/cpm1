@@ -1,4 +1,4 @@
-/* Aevy accounts on Supabase Auth (email + password, plus Google).
+/* Aevy accounts on Supabase Auth (email or phone number, with a password; phone numbers are verified with an SMS code).
    Public profile data lives in the public.profiles table and is cached in memory so views can render synchronously.
    Usernames are unique through a unique index on profiles.username (see supabase/schema.sql). */
 (function(){
@@ -31,7 +31,10 @@ function nice(e){
   if(/invalid email|unable to validate email/i.test(m))return new Error('Enter a valid email address');
   if(c==='over_request_rate_limit'||c==='over_email_send_rate_limit'||c==='email_rate_limit_exceeded'||s===429||/rate limit|too many/i.test(m))return new Error('Too many attempts. Wait a minute and try again');
   if(c==='signup_disabled')return new Error('Sign ups are disabled for this project');
-  if(c==='provider_disabled'||/provider is not enabled|unsupported provider/i.test(m))return new Error('Google sign-in is not enabled yet. Turn it on in Supabase > Authentication > Providers > Google');
+  if(c==='phone_provider_disabled'||c==='provider_disabled'||/phone.*(disabled|not enabled)|unsupported (phone )?provider/i.test(m))return new Error('Phone sign-in is not enabled yet. Turn it on in Supabase > Authentication > Providers > Phone');
+  if(c==='sms_send_failed'||/sms/i.test(m)&&/fail|error/i.test(m))return new Error('Could not send the SMS code. Check the number (with country code) and try again');
+  if(c==='phone_exists'||/phone.*(already|registered|exists)/i.test(m))return new Error('An account with that phone number already exists');
+  if(c==='otp_expired'||c==='invalid_otp'||/token has expired|invalid.*(otp|token|code)|otp/i.test(m))return new Error('That code is wrong or expired. Request a new one');
   if(c==='user_banned')return new Error('This account has been disabled');
   if(c==='session_not_found'||c==='reauthentication_needed'||/jwt|session/i.test(m)&&s===401)return new Error('Please sign in again, then retry');
   if(/database error saving new user/i.test(m))return new Error('That username is taken. Try another one');
@@ -55,6 +58,20 @@ function loadProfiles(){
     profiles=must(r).map(pub);reindex();
   });
 }
+var EMAIL_RE=/^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+/* phone numbers are stored as E.164: +<country code><number> */
+function normPhone(v){var t=String(v||'').replace(/[\s().-]/g,'');if(t.slice(0,2)==='00')t='+'+t.slice(2);return /^\+[1-9]\d{7,14}$/.test(t)?t:null}
+function isEmail(v){return String(v||'').indexOf('@')>-1}
+function who(v){
+  v=String(v||'').trim();
+  if(!v)return {err:'Enter your email or phone number'};
+  if(isEmail(v))return EMAIL_RE.test(v)?{email:v}:{err:'Enter a valid email address'};
+  var ph=normPhone(v);
+  return ph?{phone:ph}:{err:'Enter a valid email, or a phone number with country code (e.g. +8801712345678)'};
+}
+var pendingUp=null;
+/* after sign-up: the profile trigger normally made it; if not, create it from the browser */
+function finishUp(un,name){setMe();if(me||!un)return me;return A.claim(un,name).then(function(){return loadProfiles()}).then(function(){setMe();return me})}
 function setMe(){me=user?(index[user.id]||null):null}
 function ensureProfile(){return index[user.id]?Promise.resolve():loadProfiles()}
 
@@ -62,7 +79,8 @@ var A=window.AevyAuth={
   ready:null,
   current:function(){return me},
   isAdmin:function(){return !!(me&&me.role==='admin')},
-  email:function(){return user?user.email:''},
+  email:function(){return user?(user.email||(user.phone?'+'+String(user.phone).replace(/^\+/,''):'')):''},
+  isPhone:function(v){return !!v&&!isEmail(v)},
   recovery:function(){return recovering},
   byName:function(n){var k=String(n).toLowerCase();return profiles.filter(function(u){return u.username===k})[0]},
   byId:function(id){return index[id]},
@@ -87,30 +105,57 @@ var A=window.AevyAuth={
     });
   },
   signUp:function(o){
-    var un=String(o.username||'').trim().toLowerCase(),email=String(o.email||'').trim(),pw=o.password||'';
+    var un=String(o.username||'').trim().toLowerCase(),pw=o.password||'',w=who(o.id!=null?o.id:o.email);
     if(!/^[a-z0-9_]{3,20}$/.test(un))return Promise.reject(new Error('Username: 3 to 20 letters, numbers or underscores'));
-    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))return Promise.reject(new Error('Enter a valid email address'));
+    if(w.err)return Promise.reject(new Error(w.err));
     if(pw.length<8)return Promise.reject(new Error('Password must be at least 8 characters'));
     var name=((o.name||un).trim()||un).slice(0,40);
     silent++;
     return A.checkUsername(un).then(function(free){
       if(free===false)throw aevy('That username is taken. Try another one');
-      /* username + name travel as user metadata; a database trigger creates the profile (works with or without email confirmation) */
-      return sb.auth.signUp({email:email,password:pw,options:{data:{username:un,name:name},emailRedirectTo:HOME}}).then(must);
+      /* username + name travel as user metadata; a database trigger creates the profile (works with or without confirmation) */
+      var c=w.email?{email:w.email,password:pw,options:{data:{username:un,name:name},emailRedirectTo:HOME}}:{phone:w.phone,password:pw,options:{data:{username:un,name:name}}};
+      return sb.auth.signUp(c).then(must);
     }).then(function(d){
-      /* with "Confirm email" on, an already registered address returns a user with no identities instead of an error */
-      if(d.user&&d.user.identities&&d.user.identities.length===0)throw aevy('An account with that email already exists. Use the Sign in tab');
-      if(!d.session)throw aevy('Account created. Open the confirmation link we emailed you, then sign in');
+      /* with confirmation on, an already registered address returns a user with no identities instead of an error */
+      if(d.user&&d.user.identities&&d.user.identities.length===0)throw aevy(w.email?'An account with that email already exists. Use the Sign in tab':'An account with that phone number already exists. Use the Sign in tab');
+      if(!d.session){
+        if(w.phone){pendingUp={un:un,name:name};return {code:true,phone:w.phone}}   /* an SMS code was sent: ask for it */
+        throw aevy('Account created. Open the confirmation link we emailed you, then sign in');
+      }
       user=d.session.user;
-      return loadProfiles();
-    }).then(function(){
-      setMe();
-      if(me)return me;
-      /* the profile trigger did not run (schema not installed or older version): create the profile from the browser */
-      return A.claim(un,name).then(function(){return loadProfiles()}).then(function(){setMe();return me});
+      return loadProfiles().then(function(){return finishUp(un,name)});
     }).then(function(v){silent--;return v},function(e){silent--;throw nice(e)});
   },
-  /* signed in (e.g. with Google) but no profile yet: pick a username */
+  /* second step of a phone sign-up: the 6-digit SMS code */
+  verifyPhone:function(phone,code){
+    var tk=String(code||'').replace(/\D/g,'');
+    if(tk.length<4)return Promise.reject(new Error('Enter the code from the SMS'));
+    silent++;
+    return sb.auth.verifyOtp({phone:phone,token:tk,type:'sms'}).then(must).then(function(d){
+      user=d.session.user;
+      var p=pendingUp||{};pendingUp=null;
+      return loadProfiles().then(function(){return finishUp(p.un,p.name)});
+    }).then(function(v){silent--;return v},function(e){silent--;throw nice(e)});
+  },
+  /* sends a fresh SMS code: kind 'up' = sign-up confirmation, 'reset' = password reset */
+  sendCode:function(phone,kind){
+    var w=normPhone(phone);
+    if(!w)return Promise.reject(new Error('Enter a valid phone number with country code (e.g. +8801712345678)'));
+    var q=kind==='up'?sb.auth.resend({type:'sms',phone:w}):sb.auth.signInWithOtp({phone:w,options:{shouldCreateUser:false}});
+    return q.then(function(r){if(r.error)throw r.error;return w},function(e){throw nice(e)});
+  },
+  /* forgot password by phone: the SMS code signs the user in, then the app asks for a new password */
+  verifyReset:function(phone,code){
+    var tk=String(code||'').replace(/\D/g,'');
+    if(tk.length<4)return Promise.reject(new Error('Enter the code from the SMS'));
+    silent++;
+    return sb.auth.verifyOtp({phone:phone,token:tk,type:'sms'}).then(must).then(function(d){
+      user=d.session.user;
+      return ensureProfile().then(function(){setMe();recovering=true;setTimeout(function(){window.dispatchEvent(new Event('aevy:recovery'))},0);return me});
+    }).then(function(v){silent--;return v},function(e){silent--;throw nice(e)});
+  },
+  /* signed in but no profile yet: pick a username */
   pending:function(){return !!user&&!me},
   suggest:function(){
     if(!user)return {name:'',username:''};
@@ -127,14 +172,6 @@ var A=window.AevyAuth={
     return A.claim(un,name).then(function(){return loadProfiles()}).then(function(){setMe();return me})
       .then(function(v){silent--;return v},function(e){silent--;throw nice(e)});
   },
-  /* Redirects to Google and back; the page reloads signed in (a username is asked for on first login). */
-  google:function(){
-    silent++;
-    return sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:HOME,queryParams:{prompt:'select_account'}}}).then(function(r){
-      if(r.error)throw r.error;
-      return new Promise(function(){});
-    }).then(null,function(e){silent--;throw nice(e)});
-  },
   resetPassword:function(email){
     email=String(email||'').trim();
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))return Promise.reject(new Error('Enter your email address first'));
@@ -148,9 +185,11 @@ var A=window.AevyAuth={
     if((pw||'').length<8)return Promise.reject(new Error('Password must be at least 8 characters'));
     return sb.auth.updateUser({password:pw}).then(must).then(function(){recovering=false},function(e){throw nice(e)});
   },
-  signIn:function(email,pw){
+  signIn:function(idv,pw){
+    var w=who(idv);
+    if(w.err)return Promise.reject(new Error(w.err));
     silent++;
-    return sb.auth.signInWithPassword({email:String(email).trim(),password:pw}).then(must).then(function(d){
+    return sb.auth.signInWithPassword(w.email?{email:w.email,password:pw}:{phone:w.phone,password:pw}).then(must).then(function(d){
       user=d.user;
       return ensureProfile().then(function(){setMe();return me});
     }).then(function(v){silent--;return v},function(e){silent--;throw nice(e)});
@@ -206,7 +245,7 @@ var A=window.AevyAuth={
   },
   /* re-checks the password by signing in again */
   verify:function(pw,msg){
-    return sb.auth.signInWithPassword({email:user.email,password:pw}).then(function(r){
+    return sb.auth.signInWithPassword(user.email?{email:user.email,password:pw}:{phone:user.phone,password:pw}).then(function(r){
       if(r.error){
         /* only a real credentials failure means "wrong password"; show any other cause as it is */
         if(r.error.code==='invalid_credentials'||/invalid login credentials/i.test(r.error.message||''))throw new Error(msg||'Password is wrong');
@@ -248,13 +287,13 @@ sb.auth.onAuthStateChange(function(ev,session){
   },0);
 });
 
-/* Wait for Supabase to restore a saved session (or finish the Google / reset-link return), then load profiles. */
+/* Wait for Supabase to restore a saved session (or finish a reset-link return), then load profiles. */
 A.ready=sb.auth.getSession().then(function(r){
   user=(r.data&&r.data.session&&r.data.session.user)||null;
   return loadProfiles().catch(function(e){console.error(e)});
 }).then(function(){
   setMe();
-  /* signed in with Google but no profile yet: send the visitor to the username step */
+  /* signed in but no profile yet: send the visitor to the username step */
   if(user&&!me&&location.hash!=='#/auth'&&!recovering)history.replaceState(null,'','#/auth');
   booted=true;
 });

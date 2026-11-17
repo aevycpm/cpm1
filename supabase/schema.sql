@@ -148,8 +148,8 @@ drop trigger if exists profiles_guard on public.profiles;
 create trigger profiles_guard before insert or update on public.profiles
   for each row execute function public.profiles_guard();
 
--- Email sign-ups pass username + name as user metadata; the profile is created here so it works
--- even when "Confirm email" is on (no session yet). Google users have no username: the app asks for one.
+-- Email and phone sign-ups pass username + name as user metadata; the profile is created here so it works
+-- even before the email link / SMS code is confirmed (no session yet).
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare

@@ -13,13 +13,17 @@ Setup (about 5 minutes, one time)
 2. Authentication -> Sign In / Providers -> Email: enabled.
    Recommended: turn OFF "Confirm email" so new accounts can sign in at once.
    (With it ON everything still works: the user must click the emailed link before signing in.)
-3. Google button (optional): Authentication -> Sign In / Providers -> Google -> Enable, paste the
-   Google OAuth client ID + secret. In Google Cloud Console add this redirect URI to the client:
-       https://jjtgwzyupfqfnbkntkep.supabase.co/auth/v1/callback
+3. Phone sign-in: Authentication -> Sign In / Providers -> Phone -> Enable, then pick an SMS provider
+   (Twilio, Twilio Verify, MessageBird or Vonage) and paste its keys. SMS messages are billed by that provider.
+   A country-code picker appears when a phone number is typed. It is chosen automatically (saved choice, device time
+   zone, browser language, then defaultCountry in js/config.js) and the user can change it by hand. A leading 0 is
+   dropped, so 01712345678 becomes +8801712345678. Typing +44... or 0044... uses that country instead.
+   The user confirms the number with the 6-digit SMS code.
+   Email sign-in works without this step; only phone numbers need it.
 4. Authentication -> URL Configuration:
      Site URL        = the address where you host the site (e.g. https://yourname.github.io/aevy/)
      Redirect URLs   = add the same address, plus http://localhost:8080/ for local testing.
-   Google sign-in and password-reset links return to these addresses.
+   Password-reset links return to these addresses.
 5. Serve the folder over http(s) - do not open index.html with file://.
    Examples:  npx serve .    or    python3 -m http.server 8080
    Any static host works (Netlify, Vercel, Cloudflare Pages, GitHub Pages ...).
@@ -29,7 +33,7 @@ Security (supabase/schema.sql), not by hiding the key. Never put a secret / serv
 
 What lives where
 ----------------
-Accounts        Supabase Auth (auth.users: email + password, hashed by Supabase) and Google
+Accounts        Supabase Auth (auth.users: email or phone + password, hashed by Supabase)
 Profiles        table public.profiles      (public: username, name, bio, location, website, photo + cover address; username is unique)
 Profile photos  Storage bucket "avatars" (public read; each user can write only inside their own folder <user id>/)
 Scripts         table public.scripts       (title, language, category, visibility, preview...)
@@ -92,6 +96,8 @@ Badges and ranks (new)
                             update public.profiles set role = 'admin' where username = 'your_username';
                         Admins can delete any public script or comment (moderation). They cannot edit other people's
                         scripts and cannot read private scripts.
+- Aevy account          js/config.js has adminUsernames: ['aevy']; that account always shows the red Admin badge (never New).
+                        To also give it real moderation rights run:  update public.profiles set role = 'admin' where username = 'aevy';
 - New badge             green "New" badge on accounts younger than 7 days. Older accounts show no badge.
 - Shown next to the name on script cards, profile pages, comments, the activity feed and the top-right user chip.
 - Settings (schema.sql): aevy_verify_scripts() = 2 scripts, aevy_new_user_days() = 7 days. If you change the days,
@@ -167,8 +173,7 @@ If you ran an older schema.sql, run the new one again (it adds the "ext" column 
 
 Notes
 -----
-- Sign in uses email + password; the username is the public handle.
-- Password reset: "Forgot password?" on the sign-in form emails a reset link; opening it asks for a new password.
-- Google sign-in: new Google users are asked to pick a username before their profile is created.
+- Sign in uses email OR phone number + password; the username is the public handle.
+- Password reset: "Forgot password?" emails a reset link (email accounts) or texts a 6-digit code (phone accounts); either way the site then asks for a new password.
 - Libraries load up to 1000 public scripts / profiles. Add pagination if you grow past that.
 - supabase-js 2.117.3 is loaded from cdn.jsdelivr.net, so the site needs internet.

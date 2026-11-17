@@ -6,10 +6,12 @@
 (function(){
 'use strict';
 var cfg=window.AEVY_CONFIG||{},NEW_DAYS=cfg.newDays||7,DAY=864e5;
+/* usernames that always wear the Admin badge (display only; real Admin powers come from profiles.role in the database) */
+var ADMINS=(cfg.adminUsernames||[]).map(function(x){return String(x).toLowerCase()});
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 var CHECK='<svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true"><path fill="currentColor" d="M12 1.8l2.6 1.9 3.2-.1 1 3.1 2.6 1.9-1 3.1 1 3.1-2.6 1.9-1 3.1-3.2-.1L12 22.2l-2.6-1.9-3.2.1-1-3.1-2.6-1.9 1-3.1-1-3.1 2.6-1.9 1-3.1 3.2.1z"/><path fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M8 12.4l2.7 2.7L16.2 9.5"/></svg>';
-function isNew(u){return !!u&&!!u.created&&Date.now()-u.created<NEW_DAYS*DAY&&u.role!=='admin'}
-function isAdmin(u){return !!u&&u.role==='admin'}
+function isAdmin(u){return !!u&&(u.role==='admin'||ADMINS.indexOf(String(u.username||'').toLowerCase())>-1)}
+function isNew(u){return !!u&&!!u.created&&Date.now()-u.created<NEW_DAYS*DAY&&!isAdmin(u)}
 function isVerified(u){return !!u&&(u.verified||isAdmin(u))}
 /* html(user, big) returns the badges to place right after a name */
 function html(u,big){
