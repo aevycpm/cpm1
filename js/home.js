@@ -54,7 +54,7 @@ function leftCard(){
    '<span class="hs-nums"><span><b id="hsScripts">'+C.mine().length+'</b>Scripts</span><span><b id="hsFollowers">-</b>Followers</span><span><b id="hsFollowing">-</b>Following</span></span></a>';
 }
 function nav(){
-  return '<nav class="hs-card hs-nav" aria-label="Shortcuts"><a href="#/scripts">'+I.scripts+'Scripts</a><a href="#/community">'+I.people+'Community</a>'+
+  return '<nav class="hs-card hs-nav" aria-label="Shortcuts"><a href="#/scripts">'+I.scripts+'Scripts</a>'+
    '<a href="#/messages">'+I.msg+'Messages</a><a href="#/files">'+I.files+'My files</a><a href="#/watch">'+I.play+'Watch</a></nav>';
 }
 function composer(){

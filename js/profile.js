@@ -29,7 +29,7 @@ var IC={
 function header(u,own,list){
   var t=totals(list),cv=safeImg(u.cover);
   var rating=t.rc?(t.rs/t.rc).toFixed(1):'-';
-  var tabs=[['scripts','Scripts',list.length],['posts','Posts'],['about','About']];
+  var tabs=[['scripts','Scripts',list.length],['about','About']];
   if(own)tabs.push(['saved','Saved']);
   if(own)tabs.push(['settings','Settings']);
   var web=u.website?'<a class="ig-web" href="'+esc(u.website)+'" target="_blank" rel="noopener noreferrer nofollow">'+esc(u.website.replace(/^https?:\/\/(www\.)?/i,'').replace(/\/$/,''))+'</a>':'';
@@ -95,7 +95,6 @@ function applyPins(){
 }
 window.addEventListener('aevy:pins',function(){if(ctx&&ctx.own)applyPins()});
 window.addEventListener('aevy:saved',function(){if(tab==='saved'&&ctx&&ctx.own&&$('#ppPane'))paintPane()});
-function postsPane(){return '<div class="feed-list" id="ppPosts"><div class="empty">Loading...</div></div>'}
 function aboutPane(){
   var u=ctx.u;
   return '<div class="hs-card"><h3>About '+esc(u.name)+'</h3><p class="pp-bio">'+(u.bio?esc(u.bio):'<span class="muted-p">No bio yet.</span>')+'</p></div>';
@@ -124,8 +123,7 @@ function settingsPane(){
 function paintPane(){
   var pane=$('#ppPane');if(!pane||!ctx)return;
   $$('.pp-tabs [data-ptab]').forEach(function(b){var on=b.dataset.ptab===tab;b.classList.toggle('on',on);b.setAttribute('aria-selected',on)});
-  if(tab==='posts'){pane.innerHTML=postsPane();if(window.AevyCommunity&&AevyCommunity.mountPosts)AevyCommunity.mountPosts($('#ppPosts'),ctx.u.id)}
-  else if(tab==='about')pane.innerHTML=aboutPane();
+  if(tab==='about')pane.innerHTML=aboutPane();
   else if(tab==='saved'&&ctx.own)pane.innerHTML=savedPane();
   else if(tab==='settings'&&ctx.own){pane.innerHTML=settingsPane();wireSettings()}
   else{tab='scripts';pane.innerHTML=scriptsPane();wireScripts();decorate()}

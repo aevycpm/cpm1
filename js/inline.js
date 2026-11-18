@@ -11,7 +11,7 @@ function ago(t){var s=Math.max(0,(Date.now()-t)/1000);if(s<45)return 'now';if(s<
 function av(u,n){return u&&window.AevyEco?AevyEco.avatar(u,n):'<span class="avatar" style="width:'+n+'px;height:'+n+'px">?</span>'}
 function row(r){return {id:r.id,owner:r.owner,body:r.body,rating:r.rating||0,t:Date.parse(r.created)||Date.now()}}
 function script(id){return C.all().filter(function(s){return s.id===id})[0]}
-function cardsOf(id){return $$('.fb-post').filter(function(c){return c.dataset.open===id})}
+function cardsOf(id){return $$('.ig-post,.fb-post').filter(function(c){return c.dataset.open===id})}
 
 function itemHTML(c,s){
   var u=A.byId(c.owner),m=A.current(),can=m&&(c.owner===m.id||(A.isAdmin&&A.isAdmin())||(s&&C.isOwner(s)));
@@ -43,7 +43,7 @@ function load(id){
 }
 function toggle(id){
   open[id]=!open[id];paint(id);
-  if(open[id]){load(id);var i=$('.fb-post[data-open="'+id+'"] .ic-in');if(i&&window.matchMedia('(min-width:761px)').matches)i.focus()}
+  if(open[id]){load(id);var i=$('.ig-post[data-open="'+id+'"] .ic-in');if(i&&window.matchMedia('(min-width:761px)').matches)i.focus()}
 }
 document.addEventListener('click',function(e){
   var b=e.target.closest('[data-act="cmt"]');

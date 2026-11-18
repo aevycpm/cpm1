@@ -884,3 +884,69 @@ begin
   return n;
 end $$;
 revoke all on function public.purge_old_guests(int) from public, anon, authenticated;
+
+
+-- =====================================================================================
+-- Encrypted messages + guest isolation (v7). Safe to run again.
+-- Messages are encrypted in the browser (js/e2e.js). The database only ever sees "e2e1:<ciphertext>".
+-- =====================================================================================
+
+-- Public keys: everyone signed in can read the key of someone they may talk to; only the owner can write theirs.
+create table if not exists public.user_keys (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  pubkey  text not null check (char_length(pubkey) between 40 and 400),
+  updated timestamptz not null default now()
+);
+alter table public.user_keys enable row level security;
+drop policy if exists user_keys_read   on public.user_keys;
+drop policy if exists user_keys_insert on public.user_keys;
+drop policy if exists user_keys_update on public.user_keys;
+-- guests and members live in separate worlds: you can only read keys of your own kind (and your own)
+create policy user_keys_read   on public.user_keys for select to authenticated
+  using (user_id = (select auth.uid()) or public.is_guest(user_id) = public.is_guest());
+create policy user_keys_insert on public.user_keys for insert to authenticated with check (user_id = (select auth.uid()));
+create policy user_keys_update on public.user_keys for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+grant select, insert, update on public.user_keys to authenticated;
+revoke all on public.user_keys from anon;
+
+-- Recovery backup: the PRIVATE key, already encrypted in the browser with the user's passphrase. Owner only.
+create table if not exists public.key_backups (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  blob    text not null check (char_length(blob) <= 4000),
+  updated timestamptz not null default now()
+);
+alter table public.key_backups enable row level security;
+drop policy if exists key_backups_own on public.key_backups;
+create policy key_backups_own on public.key_backups for all to authenticated
+  using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+grant select, insert, update, delete on public.key_backups to authenticated;
+revoke all on public.key_backups from anon;
+
+-- Ciphertext is longer than the text it hides.
+alter table public.messages drop constraint if exists messages_body_check;
+alter table public.messages add constraint messages_body_check check (char_length(btrim(body)) between 1 and 16000);
+-- From now on the server refuses plain text. (NOT VALID: messages sent before this update stay readable.)
+alter table public.messages drop constraint if exists messages_encrypted;
+alter table public.messages add constraint messages_encrypted check (body like 'e2e1:%') not valid;
+
+-- Guests are invisible to members: guests can browse public scripts,
+-- but a guest profile can only be seen by that guest and by other guests.
+drop policy if exists guest_profiles on public.profiles;
+create policy guest_profiles on public.profiles as restrictive for select
+  using (not guest or id = (select auth.uid()) or public.is_guest());
+
+-- A conversation between a guest and a member can never be read, even by its two participants.
+drop policy if exists guest_msg_read on public.messages;
+create policy guest_msg_read on public.messages as restrictive for select to authenticated
+  using (public.is_guest(sender) = public.is_guest(recipient));
+
+-- Online status: guests only see other guests, members never see guests.
+create or replace function public.get_presence(ids uuid[] default null) returns table (user_id uuid, last_seen timestamptz)
+language sql stable security definer set search_path = public as $$
+  select p.user_id, case when p.hidden and p.user_id <> auth.uid() then null else p.last_seen end
+  from public.presence p
+  where ((ids is null and p.last_seen > now() - interval '3 minutes') or p.user_id = any (ids))
+    and (p.user_id = auth.uid() or public.is_guest(p.user_id) = public.is_guest())
+$$;
+revoke all on function public.get_presence(uuid[]) from public;
+grant execute on function public.get_presence(uuid[]) to anon, authenticated;

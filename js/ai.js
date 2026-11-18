@@ -20,7 +20,7 @@ var IC={
  list:'<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>'
 };
 var IDEAICON=['code','code','pen','list'];
-var chats=[],cur=null,busy=false,img=null,search=false,side=false;
+var loadedFor=null,chats=[],cur=null,busy=false,img=null,search=false,side=false;
 function me(){return A.current()}
 function key(){return 'aevy.ai.v1.'+(me()?me().id:'x')}
 function load(){try{chats=JSON.parse(localStorage.getItem(key())||'[]')}catch(e){chats=[]}}
@@ -56,13 +56,14 @@ function shell(){
    '<section class="ai-main"><header class="ai-top"><button type="button" class="ai-menu" id="aiMenu" aria-label="Chats">'+IC.menu+'</button><b><i>'+IC.spark+'</i><span>Aevy AI</span></b>'+
    '<div class="ai-modes" id="aiModes" role="tablist" aria-label="Mode">'+MODES.map(function(m){return '<button type="button" role="tab" data-mode="'+m[0]+'" class="'+(c.mode===m[0]?'on':'')+'" aria-selected="'+(c.mode===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>'+
    '<label class="ai-web" title="Let the AI search the web">'+IC.globe+'<input type="checkbox" id="aiWeb"'+(search?' checked':'')+'> Web</label></header>'+
-   '<div class="ai-log" id="aiLog">'+(c.msgs.length?c.msgs.map(msgHTML).join(''):'<div class="ai-empty"><div class="ai-logo">'+IC.spark+'</div><h2>How can I help you today?</h2><p>Ask anything: code, writing, study, ideas, images.</p><div class="ai-ideas">'+IDEAS.map(function(i,n){return '<button type="button" data-idea="'+esc(i)+'">'+IC[IDEAICON[n]||'spark']+'<span>'+esc(i)+'</span></button>'}).join('')+'</div></div>')+'</div>'+
+   '<div class="ai-log" id="aiLog">'+(c.msgs.length?c.msgs.map(msgHTML).join('')+(!busy&&c.msgs[c.msgs.length-1].r==='user'?'<div class="ai-m bot"><span class="ai-av">'+IC.spark+'</span><div class="ai-b"><p>No answer was received.</p><div class="ai-tools"><button type="button" data-retry>'+IC.redo+' Try again</button></div></div></div>':''):'<div class="ai-empty"><div class="ai-logo">'+IC.spark+'</div><h2>How can I help you today?</h2><p>Ask anything: code, writing, study, ideas, images.</p><div class="ai-ideas">'+IDEAS.map(function(i,n){return '<button type="button" data-idea="'+esc(i)+'">'+IC[IDEAICON[n]||'spark']+'<span>'+esc(i)+'</span></button>'}).join('')+'</div></div>')+'</div>'+
    '<div class="ai-comp"><div id="aiPrev"></div><div class="ai-box"><label class="ai-att" title="Attach image"><input type="file" id="aiFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden>'+IC.clip+'</label><textarea id="aiIn" rows="1" maxlength="8000" placeholder="Message Aevy AI"></textarea><button type="button" class="ai-send" id="aiSend" aria-label="Send">'+IC.send+'</button></div><small>AI can make mistakes. Check important information.</small></div></section></div>';
 }
 function render(){
   var root=$('#aiRoot');if(!root)return;
   if(!me()){root.innerHTML='<div class="empty"><h3>Sign in to use Aevy AI</h3><p>Chat with an AI assistant for code, writing and more.</p><a class="btn btn-primary" href="#/auth">Sign in</a></div>';return}
-  load();if(!find(cur))cur=chats[0]?chats[0].id:null;
+  if(loadedFor!==key()){load();loadedFor=key()}
+  if(!find(cur))cur=chats[0]?chats[0].id:null;
   root.innerHTML=shell();wire();scroll();
 }
 function scroll(){var l=$('#aiLog');if(l)l.scrollTop=l.scrollHeight}
@@ -72,15 +73,18 @@ function send(text,redo){
   text=String(text||'').trim();
   if(!redo){if(!text&&!img)return;c.msgs.push({r:'user',t:text||'Describe this image.',img:!!img});if(c.title==='New chat')c.title=(text||'Image').slice(0,36)}
   var payload=c.msgs.map(function(m,i){var o={role:m.r==='user'?'user':'model',text:m.t};if(img&&!redo&&i===c.msgs.length-1&&m.r==='user')o.image=img;return o});
+  var cid=c.id;
   img=null;busy=true;save();render();typing(true);
-  SB.functions.invoke('ai-chat',{body:{messages:payload,mode:c.mode,search:search}}).then(function(r){
+  var call=SB.functions.invoke('ai-chat',{body:{messages:payload,mode:c.mode,search:search}});
+  var limit=new Promise(function(_,no){setTimeout(function(){no(new Error('The AI took too long to answer. Check that the ai-chat function is deployed and GEMINI_API_KEY is set, then try again.'))},60000)});
+  Promise.race([call,limit]).then(function(r){
     var d=r.data,e=r.error;
     if(e&&e.context&&typeof e.context.json==='function'){   /* non-2xx: read the real message the function sent */
       return e.context.json().then(function(j){throw new Error((j&&j.error)||e.message)},function(){throw new Error(e.message||'AI request failed')});
     }
     if(e||!d||d.error){throw new Error((d&&d.error)||(e&&e.message)||'AI is not reachable. Check that the ai-chat function is deployed.')}
-    c.msgs.push({r:'bot',t:d.text,src:d.sources||[]});
-  }).catch(function(x){c.msgs.push({r:'bot',t:'Sorry, something went wrong: '+(x.message||x)})}).then(function(){busy=false;save();render()});
+    (find(cid)||c).msgs.push({r:'bot',t:d.text,src:d.sources||[]});
+  }).catch(function(x){console.error('Aevy AI:',x);(find(cid)||c).msgs.push({r:'bot',t:'Sorry, something went wrong: '+(x.message||x)})}).then(function(){busy=false;save();render()});
 }
 function wire(){
   var inp=$('#aiIn');
@@ -102,9 +106,10 @@ function wire(){
     var i=e.target.closest('[data-idea]');if(i){inp.value=i.dataset.idea;inp.focus();return}
     var cp=e.target.closest('[data-copy]');if(cp){var code=cp.closest('.ai-code').querySelector('code').textContent;navigator.clipboard&&navigator.clipboard.writeText(code).then(function(){cp.textContent='Copied';setTimeout(function(){cp.textContent='Copy'},1200)});return}
     var ca=e.target.closest('[data-copy-all]');if(ca){var m=ca.closest('.ai-b').cloneNode(true);var t=m.querySelector('.ai-tools');if(t)t.remove();navigator.clipboard&&navigator.clipboard.writeText(m.innerText).then(function(){C.toast('Copied')});return}
+    if(e.target.closest('[data-retry]')){send('',true);return}
     if(e.target.closest('[data-redo]')){var c=find(cur);if(c&&c.msgs.length&&c.msgs[c.msgs.length-1].r==='bot'){c.msgs.pop();send('',true)}}};
 }
-function check(){if((location.hash||'').indexOf('#/ai')===0)setTimeout(render,0)}
+function check(){if((location.hash||'').indexOf('#/ai')===0&&!busy)setTimeout(render,0)}
 window.addEventListener('hashchange',check);window.addEventListener('aevy:auth',check);setTimeout(check,300);
 window.AevyAI={render:render};
 })();

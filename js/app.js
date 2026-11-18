@@ -167,7 +167,7 @@ function setTheme(t){
 $('#theme').addEventListener('click',function(){setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark')});
 
 /* ---------- Router ---------- */
-var VIEWS=['home','scripts','files','publish','watch','auth','profile','u','community','messages','ai','about','privacy','terms','guidelines','contact'],current='';
+var VIEWS=['home','scripts','files','publish','watch','auth','profile','u','messages','ai','about','privacy','terms','guidelines','contact'],current='';
 function route(){
   var h=(location.hash||'#/').replace(/^#\/?/,'').split('/')[0]||'home';
   if(h==='library')h='scripts';
@@ -185,7 +185,7 @@ function route(){
   $$('#nav a').forEach(function(a){if(a.dataset.route===h||(h==='u'&&a.dataset.route==='profile'&&false))a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
   $$('#tabbar a').forEach(function(a){if(a.dataset.route===h)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
   closeMenu();window.scrollTo(0,0);
-  document.title=h==='home'?'Aevy | Script Publishing':'Aevy | '+({scripts:'Scripts',files:'My files',publish:'Publish',watch:'Watch',auth:'Account',profile:'Profile',u:'Profile',community:'Community',messages:'Messages',ai:'AI chat',about:'About',privacy:'Privacy Policy',terms:'Terms of Service',guidelines:'Community Guidelines',contact:'Contact'})[h];
+  document.title=h==='home'?'Aevy | Script Publishing':'Aevy | '+({scripts:'Scripts',files:'My files',publish:'Publish',watch:'Watch',auth:'Account',profile:'Profile',u:'Profile',messages:'Messages',ai:'AI chat',about:'About',privacy:'Privacy Policy',terms:'Terms of Service',guidelines:'Community Guidelines',contact:'Contact'})[h];
   if(h==='home'){renderHome();observeReveals();runStats()}
   if(h==='scripts')renderScripts();
   if(h==='files')renderFiles();
@@ -193,7 +193,6 @@ function route(){
   if(h==='watch')renderVList();
   if(window.AevyEco)AevyEco.render(h,raw);
   if(window.AevySocial)AevySocial.render(h,raw);
-  if(window.AevyCommunity)AevyCommunity.render(h);
   if(window.AevyStats)AevyStats.render(h);
 }
 window.addEventListener('hashchange',route);
@@ -233,6 +232,7 @@ var PI={
   copy:pico('<rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15"/>'),
   dl:pico('<path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 20h14"/>'),
   globe:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18"/></svg>',
+  file:pico('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'),
   lock:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
 };
 function postAuthor(s){
@@ -243,28 +243,27 @@ function postAuthor(s){
   return {av:av,nm:nm,link:!!(u&&u.username)};
 }
 function cardHTML(s,idx){
-  var peek=s.preview||'',au=postAuthor(s),id=esc(s.id);
-  var tags=(s.tags||[]).slice(0,5).map(function(t){return '<span>#'+esc(String(t).replace(/^#/,'').replace(/\s+/g,''))+'</span>'}).join(' ');
+  var au=postAuthor(s),id=esc(s.id),pv0=String(s.preview||'');
+  var tags=(s.tags||[]).slice(0,4).map(function(t){return '<span>#'+esc(String(t).replace(/^#/,'').replace(/\s+/g,''))+'</span>'}).join(' ');
   var liked=window.AevyStats&&AevyStats.liked&&AevyStats.liked(s.id);
-  var pv=String(peek).split('\n').slice(0,5).join('\n');
-  var nl=(s.likes||0),nc=(s.reviews||s.comments||0);
+  var nl=(s.likes||0),nc=(s.reviews||s.comments||0),bin=/^\[Binary or encrypted/.test(pv0);
+  var media=bin?'<div class="ig-media bin" data-dbl="'+id+'"><span class="ig-lang">'+esc(langLabel(s.lang))+'</span><span class="ig-binic">'+PI.file+'</span><span class="ig-bint"><b>'+esc(fileNameOf(s))+'</b><small>Compiled or protected file &middot; '+fmtSize(s.size||0)+'</small></span>'+HEARTBURST+'</div>'
+   :'<div class="ig-media" data-dbl="'+id+'"><span class="ig-lang">'+esc(langLabel(s.lang))+'</span><pre>'+esc(pv0.split('\n').slice(0,5).join('\n')||s.title)+'</pre>'+HEARTBURST+'</div>';
   return '<article class="card ig-post" style="--i:'+(idx||0)+'" data-open="'+id+'">'+
    '<header class="ig-head">'+au.av+'<div class="ig-who">'+au.nm+'<span class="dot">&middot;</span><span class="ig-ago">'+esc(timeAgo(s.created))+'</span>'+(s.vis==='private'?'<span class="dot">&middot;</span>'+PI.lock:'')+'</div>'+
-   '<button type="button" class="ig-more" data-act="share" data-id="'+id+'" aria-label="More">&#8943;</button></header>'+
-   '<div class="ig-media" data-dbl="'+id+'"><span class="ig-lang">'+esc(langLabel(s.lang))+'</span><pre>'+esc(pv||s.title)+'</pre><svg class="ig-burst" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.6 3.7 4.5 7 4.5c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3.3 0 5.4 3.1 4.2 6.6-1.7 4.8-9.2 9.4-9.2 9.4z"/></svg></div>'+
-   '<button type="button" class="ig-dlbtn" data-act="dl" data-id="'+id+'">'+PI.dl+'<span>Download</span><small>'+esc(fileNameOf(s))+' &middot; '+fmtSize(s.size||0)+'</small></button>'+
+   '<button type="button" class="ig-more" data-act="share" data-id="'+id+'" aria-label="Share">&#8943;</button></header>'+
+   '<div class="ig-title"><h3>'+esc(s.title)+'</h3>'+(s.desc?'<p class="ig-desc">'+esc(s.desc)+'</p>':'')+'</div>'+
+   media+
+   '<button type="button" class="ig-dlbtn" data-act="dl" data-id="'+id+'">'+PI.dl+'<span>Download</span><small>'+fmtSize(s.size||0)+'</small></button>'+
    '<div class="post-acts ig-acts">'+
-    '<button class="pact'+(liked?' on':'')+'" data-act="like" data-id="'+id+'" aria-pressed="'+!!liked+'" aria-label="Like">'+PI.like+'</button>'+
-    '<button class="pact" data-act="cmt" data-id="'+id+'" aria-expanded="false" aria-label="Comment">'+PI.cmt+'</button>'+
+    '<button class="pact'+(liked?' on':'')+'" data-act="like" data-id="'+id+'" aria-pressed="'+!!liked+'" aria-label="Like">'+PI.like+'<b class="pc" data-lc="'+id+'">'+(nl?nl.toLocaleString():'')+'</b></button>'+
+    '<button class="pact" data-act="cmt" data-id="'+id+'" aria-expanded="false" aria-label="Comments">'+PI.cmt+'<b class="pc">'+(nc?nc:'')+'</b></button>'+
     '<button class="pact" data-act="share" data-id="'+id+'" aria-label="Share">'+PI.share+'</button>'+
     '<span class="ig-save">'+(window.AevySaved?AevySaved.btn(s.id):'')+'</span></div>'+
-   '<div class="ig-likes"><b>'+nl.toLocaleString()+' like'+(nl===1?'':'s')+'</b></div>'+
-   '<p class="ig-cap"><b>'+esc((au.link&&(AevyAuth.byId(s.owner)||{}).username)||s.author||'user')+'</b> <strong>'+esc(s.title)+'</strong>'+(s.desc?' '+esc(s.desc):'')+'</p>'+
-   (tags?'<p class="ig-tags">'+tags+'</p>':'')+
    (window.AevyStats?AevyStats.cardStats(s):'')+
-   '<button type="button" class="ig-viewc" data-act="cmt" data-id="'+id+'">'+(nc?'View all '+nc+' comments':'Add a comment...')+'</button>'+
-   '<time class="ig-time">'+esc(timeAgo(s.created)).toUpperCase()+' &middot; '+esc(fileNameOf(s))+' &middot; '+fmtSize(s.size||0)+'</time></article>';
+   (tags?'<p class="ig-tags">'+tags+'</p>':'')+'</article>';
 }
+var HEARTBURST='<svg class="ig-burst" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.6 3.7 4.5 7 4.5c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3.3 0 5.4 3.1 4.2 6.6-1.7 4.8-9.2 9.4-9.2 9.4z"/></svg>';
 function tileHTML(s){
   var id=esc(s.id),pv=String(s.preview||'').split('\n').slice(0,9).join('\n');
   return '<div class="tile" data-open="'+id+'" role="button" tabindex="0" aria-label="'+esc(s.title)+'" style="--lc:'+langColor(s.lang)+'">'+

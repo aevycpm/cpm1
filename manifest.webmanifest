@@ -17,7 +17,6 @@
   ],
   "shortcuts": [
     { "name": "Publish a script", "url": "./#/publish" },
-    { "name": "Messages", "url": "./#/messages" },
-    { "name": "Community", "url": "./#/community" }
+    { "name": "Messages", "url": "./#/messages" }
   ]
 }

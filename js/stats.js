@@ -1,4 +1,4 @@
-/* Aevy live layer: download / view / visitor counters, likes, reviews and the Community page.
+/* Aevy live layer: download / view / visitor counters, likes, reviews and per-post stats.
    Everything is pushed to every open browser through Supabase Realtime (one channel, see start()).
    Counters are changed only by the SQL functions in supabase/schema.sql, never directly by the browser. */
 (function(){
@@ -79,15 +79,13 @@ function cardStats(s){
 }
 function statsInner(s){
   var r=rating(s);
-  return '<span class="cs-l">'+(s.likes?'<span class="cs-heart">'+I.heart+'</span><b>'+num(s.likes)+'</b>':'<span>Be the first to like this</span>')+'</span>'+
-   '<span class="cs-r">'+
-   '<span class="cs" title="Views"><b>'+num(s.views)+'</b> views</span>'+
+  return '<span class="cs" title="Views"><b>'+num(s.views)+'</b> views</span>'+
    '<span class="cs" title="Downloads"><b>'+num(s.downloads)+'</b> downloads</span>'+
-   '<span class="cs'+(r?' on':'')+'" title="'+(r?r.toFixed(1)+' average from '+s.rcount+' review'+(s.rcount===1?'':'s'):'No reviews yet')+'">'+(r?I.star+'<b>'+r.toFixed(1)+'</b>':'')+'</span>'+
-   '</span>';
+   (r?'<span class="cs on" title="'+r.toFixed(1)+' average from '+s.rcount+' review'+(s.rcount===1?'':'s')+'"><b>'+r.toFixed(1)+'</b> &#9733;</span>':'');
 }
 function paintScript(s){
   $$('.cstats[data-sid="'+s.id+'"]').forEach(function(el){el.innerHTML=statsInner(s)});
+  $$('.pc[data-lc="'+s.id+'"]').forEach(function(el){el.textContent=s.likes?num(s.likes):''});
   $$('.pact[data-act="like"][data-id="'+s.id+'"]').forEach(function(b){b.classList.toggle('on',!!mine[s.id]);b.setAttribute('aria-pressed',!!mine[s.id])});
   if(openS&&openS.id===s.id)paintSocialBar();
   paintToday();
@@ -228,14 +226,8 @@ document.addEventListener('click',function(e){
 });
 (function(){var dlg=$('#dlg');if(dlg)dlg.addEventListener('close',function(){openS=null;comments=[]})})();
 
-/* ---------- Community page ---------- */
+/* ---------- Live activity helpers ---------- */
 var feed=[],FEED_MAX=40;
-var sec=document.createElement('section');sec.className='view';sec.id='view-community';sec.dataset.view='community';
-sec.innerHTML='<div class="page-head"><div class="wrap"><p class="eyebrow">Community</p><h1>Post, like and review. Live.</h1><p>Everything here updates the moment someone publishes a script, leaves a review or likes one. No refresh needed.</p></div></div>'+
- '<div class="wrap com-grid"><div><div class="sec-head slim"><div><h2>Live activity</h2></div><span class="live-tag sm"><span class="live-dot"></span>Live</span></div><ol class="feed" id="feed" aria-live="polite"><li class="cempty">Loading...</li></ol></div>'+
- '<aside class="side"><div class="panel"><h3>Share your work</h3><p>Publish a script so the community can download, like and review it.</p><a class="btn btn-primary" href="#/publish">Post a script</a></div>'+
- '<div class="panel"><h3>Most downloaded</h3><ol class="top" id="topDl"></ol></div><div class="panel"><h3>Top rated</h3><ol class="top" id="topRated"></ol></div></aside></div>';
-/* the Community page is now built by js/community.js */
 
 function fItem(f){
   var s=C.byId(f.sid);if(!s||s.vis!=='public')return '';   /* the public feed never shows private scripts */

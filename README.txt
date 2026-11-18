@@ -216,3 +216,20 @@ Likes, comments, follows, posts, scripts and the AI chat are blocked in the site
 Setup: 1) run the latest supabase/schema.sql   2) Supabase > Authentication > Sign In / Providers >
 turn ON "Allow anonymous sign-ins"   3) paste the updated ai-chat function (it now refuses guests).
 Tidy up old guests now and then (SQL editor):  select public.purge_old_guests(30);
+
+
+v7: Encrypted messages, guest isolation, Community removed
+----------------------------------------------------------
+1. Run the whole supabase/schema.sql again in the Supabase SQL editor (safe to repeat). The last section adds
+   user_keys, key_backups, the "encrypted only" rule for messages, and guest isolation.
+2. Messages are end-to-end encrypted in the browser (js/e2e.js, ECDH P-256 + AES-256-GCM). The server stores
+   only "e2e1:<ciphertext>". Not even the site owner can read a chat.
+3. Each person must open Aevy once after this update so their key is created. Until then, others get the message
+   "has not turned on encrypted messages yet" when they try to write to them.
+4. On first use a recovery passphrase is offered. It lets the person read chats on another device. It is never sent
+   to the server and cannot be reset. If lost, "Reset encryption" creates new keys and old chats stay unreadable.
+   Guests keep their key on that device only.
+5. Messages sent before this update stay readable (they were plain text). Delete them if you want a clean start.
+6. Guests and members cannot see each other: profiles, keys, online status and chats are separated by the database.
+7. Limits: the app does not (yet) show safety numbers to verify a contact's key, so it protects against reading by
+   the server or the database, but not against a server that actively swaps public keys.

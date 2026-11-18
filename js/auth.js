@@ -77,7 +77,7 @@ var A=window.AevyAuth={
   recovery:function(){return recovering},
   byName:function(n){var k=String(n).toLowerCase();return profiles.filter(function(u){return u.username===k})[0]},
   byId:function(id){return index[id]},
-  all:function(){return profiles.slice()},
+  all:function(){return profiles.filter(function(u){return !u.guest||(me&&(me.guest||me.id===u.id))})},
   refreshProfiles:function(){return loadProfiles().then(setMe)},
   /* true = free, false = taken, null = could not check (never blocks the form) */
   checkUsername:function(un){

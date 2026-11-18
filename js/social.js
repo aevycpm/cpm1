@@ -138,19 +138,21 @@ var P={
 var msgs=[],loaded=false,chan=null,tchan=null,tmpN=0,typing={},tout={},outCh={},lastTyped={};
 var threads=[],pageThread=null,dockWins=[],popTab='all',pageTab='all';
 var DOCK_KEY='aevy.dock';
+function E(){return window.AevyE2E}
+function opened(rows){return Promise.all((rows||[]).map(function(r){var m=mrow(r);return E()?E().open(m):Promise.resolve(m)}))}
 function mrow(r){return {id:r.id,s:r.sender,r:r.recipient,body:r.body,t:Date.parse(r.created)||Date.now(),read:!!r.read_at}}
 function addMsg(m){for(var i=0;i<msgs.length;i++)if(msgs[i].id===m.id)return false;msgs.push(m);return true}
 function loadMsgs(){
   if(!me())return Promise.resolve();
   var id=me().id;
   return SB.from('messages').select('*').or('sender.eq.'+id+',recipient.eq.'+id).order('created',{ascending:false}).limit(500).then(function(r){
-    if(r.error)throw r.error;msgs=(r.data||[]).map(mrow);loaded=true;badgeCount();
+    if(r.error)throw r.error;return opened(r.data).then(function(list){msgs=list;loaded=true;badgeCount()});
   });
 }
 function loadPair(other){
   var a=me().id;
   return SB.from('messages').select('*').or('and(sender.eq.'+a+',recipient.eq.'+other+'),and(sender.eq.'+other+',recipient.eq.'+a+')').order('created',{ascending:false}).limit(200).then(function(r){
-    if(!r.error)(r.data||[]).forEach(function(x){addMsg(mrow(x))});
+    if(r.error)return;return opened(r.data).then(function(list){list.forEach(addMsg)});
   });
 }
 function unreadFrom(id){return msgs.filter(function(m){return m.s===id&&m.r===me().id&&!m.read}).length}
@@ -197,7 +199,7 @@ function mobile(){return window.innerWidth<=760}
   fit();
 })();
 function first(u){return String(u.name||u.username).split(/\s+/)[0]}
-function preview(m){return (m.s===me().id?'You: ':'')+String(m.body).replace(/\s+/g,' ').slice(0,70)}
+function preview(m){if(m.locked)return 'Encrypted message';return (m.s===me().id?'You: ':'')+String(m.body).replace(/\s+/g,' ').slice(0,70)}
 
 /* ---------- shared conversation list item ---------- */
 function convoItem(c,on){
@@ -212,7 +214,7 @@ function personItem(u){
 function listHTML(q,tab,activeId,emptyMsg){
   q=q.trim().toLowerCase().replace(/^@/,'');
   if(q){
-    var us=A.all().filter(function(u){return u.id!==me().id&&(!me().guest||u.guest)&&(u.username.indexOf(q)>-1||(u.name||'').toLowerCase().indexOf(q)>-1)}).slice(0,12);
+    var us=A.all().filter(function(u){return u.id!==me().id&&!!me().guest===!!u.guest&&(u.username.indexOf(q)>-1||(u.name||'').toLowerCase().indexOf(q)>-1)}).slice(0,12);
     return us.length?'<li class="ci-h">People</li>'+us.map(personItem).join(''):'<li class="ci-empty"><b>No one found</b><span>Try a different name or @username.</span></li>';
   }
   var cs=convos();if(tab==='unread')cs=cs.filter(function(c){return c.n});
@@ -296,12 +298,12 @@ function bubble(m,mine,fst,lst){
   var cls='cb '+(mine?'me':'them')+(fst?' first':'')+(lst?' last':'')+(m.pending?' pending':'')+(m.failed?' failed':'');
   return '<div class="'+cls+'" data-mid="'+esc(m.id)+'"><div class="cb-row">'+
    (mine&&!m.pending&&!m.failed?'<button type="button" class="cb-del" data-unsend="'+esc(m.id)+'" title="Unsend" aria-label="Unsend message">'+ico(P.trash,15)+'</button>':'')+
-   '<div class="cb-in" title="'+esc(fullTime(m.t))+'"><p>'+rich(m.body)+'</p></div></div>'+
+   '<div class="cb-in'+(m.locked?' locked':'')+'" title="'+esc(fullTime(m.t))+'"><p>'+(m.locked?'<span class="cb-lk">'+E().lockIcon+'Encrypted message</span> <button type="button" class="cb-unl" data-e2e>Unlock</button>':rich(m.body))+'</p></div></div>'+
    (lst?'<span class="cb-time">'+hm(m.t)+'</span>':'')+'</div>';
 }
 function paintBody(t,stick){
   var b=t.body;if(!b||!me())return;
-  var id=me().id,list=pair(t.u.id),near=b.scrollHeight-b.scrollTop-b.clientHeight<90,html='',prevDay='',prev=null,lastMine=-1;
+  var id=me().id,list=pair(t.u.id).slice(-200),near=b.scrollHeight-b.scrollTop-b.clientHeight<90,html='',prevDay='',prev=null,lastMine=-1;
   list.forEach(function(m,i){if(m.s===id)lastMine=i});
   list.forEach(function(m,i){
     var day=new Date(m.t).toDateString(),next=list[i+1],mine=m.s===id;
@@ -314,7 +316,8 @@ function paintBody(t,stick){
     }
     prev=m;
   });
-  if(!list.length)html='<div class="cw-intro"><span class="avw">'+av(t.u,64)+'</span><b>'+esc(t.u.name)+'</b><span>@'+esc(t.u.username)+'</span><p>This is the start of your conversation. Say hello.</p></div>';
+  html=(E()?E().banner():'')+html;
+  if(!list.length)html=(E()?E().banner():'')+'<div class="cw-intro"><span class="avw">'+av(t.u,64)+'</span><b>'+esc(t.u.name)+'</b><span>@'+esc(t.u.username)+'</span><p>This is the start of your conversation. Say hello.</p><p class="cw-enc">'+(E()?E().lockIcon:'')+'Messages are end-to-end encrypted</p></div>';
   b.innerHTML=html;
   if(stick||near)b.scrollTop=b.scrollHeight;
 }
@@ -338,13 +341,23 @@ function sendFrom(t){
 }
 function doSend(tmp){
   tmp.pending=true;tmp.failed=false;
-  SB.from('messages').insert({sender:me().id,recipient:tmp.r,body:tmp.body}).select('*').single().then(function(r){
+  var e=E();
+  (e?e.encrypt(tmp.r,tmp.body):Promise.reject({code:'off'})).then(function(ct){
+    return SB.from('messages').insert({sender:me().id,recipient:tmp.r,body:ct}).select('*').single();
+  }).then(function(r){
     if(r.error){
       tmp.pending=false;tmp.failed=true;
       C.toast(/too fast/i.test(r.error.message||'')?'You are sending messages too fast. Wait a moment':/row-level security|42501|42P01|PGRST205/i.test((r.error.message||'')+(r.error.code||''))?'Messaging is not set up yet. Run the latest supabase/schema.sql':(r.error.message||'Could not send'));
-    }else{msgs=msgs.filter(function(x){return x!==tmp});addMsg(mrow(r.data))}
+    }else{msgs=msgs.filter(function(x){return x!==tmp});var m=mrow(r.data);m.body=tmp.body;addMsg(m)}
     repaint(tmp.r,true);
-  },function(){tmp.pending=false;tmp.failed=true;C.toast('Cannot reach the server');repaint(tmp.r,true)});
+  },function(x){
+    tmp.pending=false;tmp.failed=true;var c=x&&x.code;
+    if(c==='locked'){C.toast('Unlock your messages first');if(e)e.prompt(true)}
+    else if(c==='nokey'){var u=A.byId(tmp.r);C.toast((u?'@'+u.username:'This person')+' has not turned on encrypted messages yet. They need to open Aevy once.')}
+    else if(c==='off')C.toast('Encrypted messages are not available here. Use a current browser over https.');
+    else C.toast('Cannot reach the server');
+    repaint(tmp.r,true);
+  });
 }
 function findTmp(id){for(var i=0;i<msgs.length;i++)if(msgs[i].id===id)return msgs[i]}
 document.addEventListener('click',function(e){
@@ -523,14 +536,17 @@ function listen(){
   if(!me())return;
   chan=SB.channel('aevy-dm-'+me().id)
    .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages'},function(p){
-     var m=mrow(p.new),id=me().id;if(m.s!==id&&m.r!==id)return;
-     if(!addMsg(m))return;
-     var other=m.s===id?m.r:m.s;
-     if(m.r===id){
-       delete typing[m.s];
-       if(visible(m.s))markRead(m.s);else notify(A.byId(m.s),m);
-     }
-     repaint(other,true);paintTyping();
+     var id=me().id;if(p.new.sender!==id&&p.new.recipient!==id)return;
+     opened([p.new]).then(function(l){
+       var m=l[0];
+       if(!addMsg(m))return;
+       var other=m.s===id?m.r:m.s;
+       if(m.r===id){
+         delete typing[m.s];
+         if(visible(m.s))markRead(m.s);else notify(A.byId(m.s),m);
+       }
+       repaint(other,true);paintTyping();
+     });
    })
    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'messages'},function(p){
      var n=p.new;if(!n||!n.id)return;
@@ -560,7 +576,8 @@ function start(){
     return Promise.resolve();
   }
   $('#mStatus').checked=!hidden();
-  return Promise.all([loadFollowing(),loadMsgs().catch(function(e){console.warn('Messages: run the latest supabase/schema.sql',e)})]).then(function(){
+  var keys=window.AevyE2E?window.AevyE2E.init(me()).catch(function(){}):Promise.resolve();
+  return Promise.all([loadFollowing(),keys.then(loadMsgs).catch(function(e){console.warn('Messages: run the latest supabase/schema.sql',e)})]).then(function(){
     listen();typingListen();beat().then(function(){return pollOnline()});badgeCount();restoreDock();window.dispatchEvent(new Event('aevy:following'));
   });
 }
@@ -569,12 +586,13 @@ function renderView(h,raw){
   badgeCount();
   if(h!=='messages'||!me())return;
   var un=decodeURIComponent((raw.split('/')[1]||'')).toLowerCase();
-  (loaded?Promise.resolve():loadMsgs().catch(function(){})).then(function(){$('#mFind').value='';openPage(un)});
+  (loaded?Promise.resolve():loadMsgs().catch(function(){})).then(function(){$('#mFind').value='';openPage(un);if(E())E().prompt(false)});
 }
 window.AevySocial={render:renderView,visible:function(){return !hidden()},setVisible:function(v){try{localStorage.setItem(HIDE_KEY,v?'0':'1')}catch(e){}beat()},online:isOnline,following:function(){return following},counts:counts,followBtn:followBtn,
   onlineIds:function(){return Object.keys(seen).filter(isOnline)}};
 window.AevyMessenger={open:openChat,openPopup:openPop,unread:unreadTotal};
 window.addEventListener('aevy:auth',function(){start()});
+window.addEventListener('aevy:e2e',function(){if(!me())return;loadMsgs().catch(function(){}).then(function(){threads.forEach(function(t){paintBody(t,false)});paintLists()})});
 window.addEventListener('aevy:presence',function(){paintList()});
 window.addEventListener('resize',function(){while(dockWins.length>maxWins())closeDock(dockWins[0].t.u.id,true);saveDock()});
 A.ready.then(function(){return start()});
