@@ -21,7 +21,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=s24">
+<link rel="stylesheet" href="css/style.css?v=s31">
 </head>
 <body>
 
@@ -35,6 +35,7 @@
       <a href="#/" data-route="home">Home</a>
       <a href="#/scripts" data-route="scripts">Scripts</a>
       <a href="#/community" data-route="community">Community</a>
+      <a href="#/ai" data-route="ai">Aevy AI</a>
       <a href="#/messages" data-route="messages">Messages<span class="ubadge" id="unreadBadge" hidden></span></a>
       <a href="#/files" data-route="files">My files</a>
       <a href="#/watch" data-route="watch">Watch</a>
@@ -58,6 +59,9 @@
 <section class="view" id="view-home" data-view="home">
   <div class="wrap home-social" id="homeRoot"></div>
 </section>
+
+<!-- AI CHAT -->
+<section class="view" id="view-ai" data-view="ai"><div class="wrap ai-wrap" id="aiRoot"></div></section>
 
 <!-- SCRIPTS -->
 <section class="view" id="view-scripts" data-view="scripts">
@@ -220,24 +224,26 @@
   <a href="#/community" data-route="community" aria-label="Community"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.6 3.7 4.5 7 4.5c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3.3 0 5.4 3.1 4.2 6.6-1.7 4.8-9.2 9.4-9.2 9.4z"/></svg></a>
   <a href="#/profile" data-route="profile" aria-label="Profile" id="tabProfile"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c.8-4 3.8-6 7.5-6s6.7 2 7.5 6"/></svg></a>
 </nav>
-<script src="js/config.js?v=s9" defer></script>
+<script src="js/config.js?v=s10" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" defer></script>
-<script src="js/auth.js?v=s9" defer></script>
-<script src="js/badges.js?v=s9" defer></script>
+<script src="js/auth.js?v=s10" defer></script>
+<script src="js/badges.js?v=s11" defer></script>
 <script src="js/db.js?v=s9" defer></script>
-<script src="js/app.js?v=s13" defer></script>
+<script src="js/app.js?v=s18" defer></script>
 <script src="js/trust.js?v=s1" defer></script>
 <script src="js/report.js?v=s1" defer></script>
-<script src="js/eco.js?v=s9" defer></script>
+<script src="js/eco.js?v=s10" defer></script>
 <script src="js/stats.js?v=s9" defer></script>
-<script src="js/social.js?v=s14" defer></script>
-<script src="js/home.js?v=s13" defer></script>
+<script src="js/social.js?v=s15" defer></script>
+<script src="js/home.js?v=s14" defer></script>
 <script src="js/community.js?v=s9" defer></script>
-<script src="js/profile.js?v=s15" defer></script>
+<script src="js/profile.js?v=s17" defer></script>
 <script src="js/suggest.js?v=s3" defer></script>
 <script src="js/saved.js?v=s1" defer></script>
 <script src="js/inline.js?v=s1" defer></script>
-<script src="js/instagram.js?v=s1" defer></script>
+<script src="js/guest.js?v=s1" defer></script>
+<script src="js/ai.js?v=s1" defer></script>
+<script src="js/instagram.js?v=s2" defer></script>
 <script src="js/mobile.js?v=s1" defer></script>
 <script src="js/pwa.js?v=s1" defer></script>
 </body>

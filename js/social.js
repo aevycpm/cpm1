@@ -8,7 +8,7 @@ var esc=C.esc,$=function(s,r){return (r||document).querySelector(s)},$$=function
 function me(){return A.current()}
 function badge(u){return window.AevyBadge?AevyBadge.html(u):''}
 function av(u,n){return window.AevyEco?AevyEco.avatar(u,n):''}
-function fail(e){C.toast((e&&e.message)||'Something went wrong');console.error(e)}
+function fail(e){var m=(e&&e.message)||'';if(/row-level security/i.test(m)&&me()&&me().guest)m='Guests can only message other guests. Create an account for more.';C.toast(m||'Something went wrong');console.error(e)}
 var HIDE_KEY='aevy.hideStatus';
 function hidden(){try{return localStorage.getItem(HIDE_KEY)==='1'}catch(e){return false}}
 
@@ -211,10 +211,14 @@ function personItem(u){
 function listHTML(q,tab,activeId,emptyMsg){
   q=q.trim().toLowerCase().replace(/^@/,'');
   if(q){
-    var us=A.all().filter(function(u){return u.id!==me().id&&(u.username.indexOf(q)>-1||(u.name||'').toLowerCase().indexOf(q)>-1)}).slice(0,12);
+    var us=A.all().filter(function(u){return u.id!==me().id&&(!me().guest||u.guest)&&(u.username.indexOf(q)>-1||(u.name||'').toLowerCase().indexOf(q)>-1)}).slice(0,12);
     return us.length?'<li class="ci-h">People</li>'+us.map(personItem).join(''):'<li class="ci-empty"><b>No one found</b><span>Try a different name or @username.</span></li>';
   }
   var cs=convos();if(tab==='unread')cs=cs.filter(function(c){return c.n});
+  if(!cs.length&&tab!=='unread'&&me().guest){
+    var gs=A.all().filter(function(u){return u.guest&&u.id!==me().id}).sort(function(a,b){return b.created-a.created}).slice(0,15);
+    if(gs.length)return '<li class="ci-h">Guests you can message</li>'+gs.map(personItem).join('');
+  }
   return cs.length?cs.map(function(c){return convoItem(c,c.id===activeId)}).join(''):
     '<li class="ci-empty">'+ico(P.chat,28)+'<b>'+(tab==='unread'?'You are all caught up':'No conversations yet')+'</b><span>'+(emptyMsg||'Search for a member above, or open a profile and press Message.')+'</span></li>';
 }

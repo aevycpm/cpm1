@@ -20,8 +20,10 @@ var I={
   plus:ico('<path d="M12 5v14M5 12h14"/>')
 };
 
+function isCreator(id){var u=A.byId?A.byId(id):null,B=window.AevyBadge;return !!(u&&B&&B.isCreator(u))}
 function feedList(){
-  var all=C.vis().slice(),f=S()?S().following():{};
+  /* Home only shows posts from Creators; new users' first posts stay on their profile until they earn the badge */
+  var all=C.vis().filter(function(s){return isCreator(s.owner)}),f=S()?S().following():{};
   if(tab==='following')all=all.filter(function(s){return f[s.owner]});
   if(tab==='trending'){
     var week=Date.now()-14*864e5;
@@ -63,7 +65,7 @@ function composer(){
 function suggestHTML(){
   var m=me(),f=S()?S().following():{},count={};
   C.vis().forEach(function(s){count[s.owner]=(count[s.owner]||0)+1});
-  var us=A.all().filter(function(u){return (!m||u.id!==m.id)&&!f[u.id]}).sort(function(a,b){return (count[b.id]||0)-(count[a.id]||0)||b.created-a.created}).slice(0,5);
+  var us=A.all().filter(function(u){return (!m||u.id!==m.id)&&!f[u.id]&&isCreator(u.id)}).sort(function(a,b){return (count[b.id]||0)-(count[a.id]||0)||b.created-a.created}).slice(0,5);
   if(!us.length)return '<p class="hs-empty">No suggestions right now.</p>';
   return us.map(function(u){
     return '<div class="hs-row"><a class="hs-who" href="#/u/'+esc(u.username)+'">'+av(u,38)+'<span><b>'+esc(u.name)+badge(u)+'</b><small>@'+esc(u.username)+' &middot; '+(count[u.id]||0)+' scripts</small></span></a>'+
@@ -90,6 +92,11 @@ function stories(){
     return '<a class="st" href="#/u/'+esc(u.username)+'"><span class="st-av'+(on[u.id]?' live':(count[u.id]?' ring':''))+'">'+av(u,58)+'</span><small>'+esc(u.username)+'</small></a>';
   }).join('')+'</div>';
 }
+function progress(){
+  var m=me(),B=window.AevyBadge;if(!m||!B||B.isCreator(m))return '';
+  var need=B.need,n=Math.min(need,C.mine().filter(function(s){return s.vis==='public'}).length),pct=Math.round(n/need*100);
+  return '<div class="hs-card cr-prog"><b>Become a Creator</b><p>Publish '+need+' public posts to earn the Creator badge. Until then your posts show on your profile, not in Home.</p><div class="cr-bar"><i style="width:'+pct+'%"></i></div><small>'+n+' of '+need+' posts</small></div>';
+}
 function meChip(){
   var m=me();if(!m)return '<div class="ig-me"><span class="avatar" style="width:44px;height:44px">A</span><div><b>Join Aevy</b><small>Sign in to follow creators</small></div><a href="#/auth">Sign in</a></div>';
   return '<div class="ig-me">'+av(m,44)+'<div><a href="#/profile"><b>'+esc(m.username)+'</b></a><small>'+esc(m.name)+'</small></div></div>';
@@ -97,7 +104,7 @@ function meChip(){
 function render(){
   var root=$('#homeRoot');if(!root)return;
   root.classList.toggle('guest',!me());
-  root.innerHTML='<main class="hs-mid">'+stories()+composer()+
+  root.innerHTML='<main class="hs-mid">'+composer()+progress()+
    '<div class="hs-tabs" id="homeTabs" role="tablist"><button type="button" data-tab="latest" role="tab">Latest</button><button type="button" data-tab="trending" role="tab">Trending</button><button type="button" data-tab="following" role="tab">Following</button></div>'+
    '<div class="feed-list" id="homeFeed"></div></main>'+
    '<aside class="hs-right ig-right">'+meChip()+'<div class="hs-card"><h3>Suggested for you</h3><div id="homeSuggest">'+suggestHTML()+'</div></div>'+

@@ -5,7 +5,7 @@
      new       account age        - younger than NEW_DAYS days; older accounts show no badge (keep in step with aevy_new_user_days()) */
 (function(){
 'use strict';
-var cfg=window.AEVY_CONFIG||{},NEW_DAYS=cfg.newDays||7,DAY=864e5;
+var cfg=window.AEVY_CONFIG||{},NEW_DAYS=cfg.newDays||7,DAY=864e5,NEED=cfg.creatorPosts||3;
 /* usernames that always wear the Admin badge (display only; real Admin powers come from profiles.role in the database) */
 var ADMINS=(cfg.adminUsernames||[]).map(function(x){return String(x).toLowerCase()});
 /* display names reserved for the site owner: only the EARLIEST account with that name gets the badge, so a later copycat does not */
@@ -25,12 +25,14 @@ function isVerified(u){return !!u&&(u.verified||isAdmin(u))}
 function html(u,big){
   if(!u)return '';
   var o='';
-  if(isVerified(u))o+='<span class="vbadge" title="Verified: published 2 or more scripts" role="img" aria-label="Verified">'+CHECK+'</span>';
+  if(isVerified(u))o+='<span class="vbadge" title="Creator badge" role="img" aria-label="Creator">'+CHECK+'</span>';
   if(isAdmin(u))o+='<span class="rbadge admin" title="Aevy Admin">Admin</span>';
+  else if(u.guest)o+='<span class="rbadge new" title="Guest account">Guest</span>';
   else if(isNew(u))o+='<span class="rbadge new" title="New to Aevy">New</span>';
   return o?'<span class="badges'+(big?' big':'')+'">'+o+'</span>':'';
 }
-window.AevyBadge={html:html,isNew:isNew,isAdmin:isAdmin,isVerified:isVerified,newDays:NEW_DAYS};
+function isCreator(u){return isVerified(u)}
+window.AevyBadge={need:NEED,isCreator:isCreator,html:html,isNew:isNew,isAdmin:isAdmin,isVerified:isVerified,newDays:NEW_DAYS};
 
 /* repaint when profiles change (e.g. just earned the blue check) */
 window.addEventListener('aevy:badges',function(){window.dispatchEvent(new Event('aevy:auth'))});

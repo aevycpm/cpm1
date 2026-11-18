@@ -5,6 +5,7 @@
 window.AEVY_CONFIG = {
   url: 'https://jjtgwzyupfqfnbkntkep.supabase.co',
   key: 'sb_publishable_ATZhUhGKT0KIDAQMbO2TKQ_ASu97PPj',
+  creatorPosts: 3,  /* public posts needed to earn the Creator badge; keep equal to aevy_verify_scripts() in schema.sql */
   newDays: 7,  /* how long the "New" badge shows; keep equal to aevy_new_user_days() in schema.sql */
   contactEmail: '',  /* shown on the Contact page, e.g. 'support@yourdomain.com' */
   adminNames: ['Aevy'],  /* display names reserved for the owner: the earliest account with this name shows the Admin badge */

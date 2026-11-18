@@ -167,13 +167,17 @@ function setTheme(t){
 $('#theme').addEventListener('click',function(){setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark')});
 
 /* ---------- Router ---------- */
-var VIEWS=['home','scripts','files','publish','watch','auth','profile','u','community','messages','about','privacy','terms','guidelines','contact'],current='';
+var VIEWS=['home','scripts','files','publish','watch','auth','profile','u','community','messages','ai','about','privacy','terms','guidelines','contact'],current='';
 function route(){
   var h=(location.hash||'#/').replace(/^#\/?/,'').split('/')[0]||'home';
   if(h==='library')h='scripts';
   if(VIEWS.indexOf(h)<0)h='home';
   var raw=(location.hash||'#/').replace(/^#\/?/,'');
-  if((h==='publish'||h==='files'||h==='profile'||h==='messages')&&!me()){location.hash='#/auth';return}
+  var PUB=['auth','about','privacy','terms','guidelines','contact'];
+  document.body.classList.toggle('signed-out',!me());
+  document.body.classList.toggle('is-guest',!!(me()&&me().guest));
+  if(!me()&&PUB.indexOf(h)<0){location.hash='#/auth';return}   /* no account, no entry */
+  if(me()&&me().guest&&(h==='publish'||h==='files'||h==='ai')){toast('Guests can only send messages. Create a free account for this.');location.hash='#/messages';return}
   if(h==='auth'&&me()){location.hash='#/profile';return}
   if(h===current&&h!=='u'&&h!=='messages')return;
   current=h;
@@ -181,7 +185,7 @@ function route(){
   $$('#nav a').forEach(function(a){if(a.dataset.route===h||(h==='u'&&a.dataset.route==='profile'&&false))a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
   $$('#tabbar a').forEach(function(a){if(a.dataset.route===h)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
   closeMenu();window.scrollTo(0,0);
-  document.title=h==='home'?'Aevy | Script Publishing':'Aevy | '+({scripts:'Scripts',files:'My files',publish:'Publish',watch:'Watch',auth:'Account',profile:'Profile',u:'Profile',community:'Community',messages:'Messages',about:'About',privacy:'Privacy Policy',terms:'Terms of Service',guidelines:'Community Guidelines',contact:'Contact'})[h];
+  document.title=h==='home'?'Aevy | Script Publishing':'Aevy | '+({scripts:'Scripts',files:'My files',publish:'Publish',watch:'Watch',auth:'Account',profile:'Profile',u:'Profile',community:'Community',messages:'Messages',ai:'AI chat',about:'About',privacy:'Privacy Policy',terms:'Terms of Service',guidelines:'Community Guidelines',contact:'Contact'})[h];
   if(h==='home'){renderHome();observeReveals();runStats()}
   if(h==='scripts')renderScripts();
   if(h==='files')renderFiles();
@@ -240,20 +244,26 @@ function postAuthor(s){
 }
 function cardHTML(s,idx){
   var peek=s.preview||'',au=postAuthor(s),id=esc(s.id);
-  var tags=(s.tags||[]).slice(0,5).map(function(t){return '<span>#'+esc(String(t).replace(/^#/,'').replace(/\s+/g,''))+'</span>'}).join('');
+  var tags=(s.tags||[]).slice(0,5).map(function(t){return '<span>#'+esc(String(t).replace(/^#/,'').replace(/\s+/g,''))+'</span>'}).join(' ');
   var liked=window.AevyStats&&AevyStats.liked&&AevyStats.liked(s.id);
-  return '<article class="card fb-post" style="--i:'+(idx||0)+'" data-open="'+id+'">'+
-   '<header class="post-head">'+au.av+
-    '<div class="post-who">'+au.nm+'<div class="post-sub"><span>'+esc(timeAgo(s.created))+'</span><span class="dot">&middot;</span>'+(s.vis==='private'?PI.lock:PI.globe)+'<span class="dot">&middot;</span><span>'+esc(s.vis==='private'?'Private':(s.cat||'Other'))+'</span></div></div></header>'+
-   '<div class="post-body"><h3 class="fb-title">'+esc(s.title)+'</h3><p class="d">'+esc(s.desc||'')+'</p>'+(tags?'<div class="post-tags">'+tags+'</div>':'')+'</div>'+
-   '<button type="button" class="post-dl" data-act="dl" data-id="'+id+'">'+PI.dl+'<span>Download</span><small>'+esc(fileNameOf(s))+' &middot; '+fmtSize(s.size||0)+'</small></button>'+
+  var pv=String(peek).split('\n').slice(0,5).join('\n');
+  var nl=(s.likes||0),nc=(s.reviews||s.comments||0);
+  return '<article class="card ig-post" style="--i:'+(idx||0)+'" data-open="'+id+'">'+
+   '<header class="ig-head">'+au.av+'<div class="ig-who">'+au.nm+'<span class="dot">&middot;</span><span class="ig-ago">'+esc(timeAgo(s.created))+'</span>'+(s.vis==='private'?'<span class="dot">&middot;</span>'+PI.lock:'')+'</div>'+
+   '<button type="button" class="ig-more" data-act="share" data-id="'+id+'" aria-label="More">&#8943;</button></header>'+
+   '<div class="ig-media" data-dbl="'+id+'"><span class="ig-lang">'+esc(langLabel(s.lang))+'</span><pre>'+esc(pv||s.title)+'</pre><svg class="ig-burst" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.6 3.7 4.5 7 4.5c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3.3 0 5.4 3.1 4.2 6.6-1.7 4.8-9.2 9.4-9.2 9.4z"/></svg></div>'+
+   '<button type="button" class="ig-dlbtn" data-act="dl" data-id="'+id+'">'+PI.dl+'<span>Download</span><small>'+esc(fileNameOf(s))+' &middot; '+fmtSize(s.size||0)+'</small></button>'+
+   '<div class="post-acts ig-acts">'+
+    '<button class="pact'+(liked?' on':'')+'" data-act="like" data-id="'+id+'" aria-pressed="'+!!liked+'" aria-label="Like">'+PI.like+'</button>'+
+    '<button class="pact" data-act="cmt" data-id="'+id+'" aria-expanded="false" aria-label="Comment">'+PI.cmt+'</button>'+
+    '<button class="pact" data-act="share" data-id="'+id+'" aria-label="Share">'+PI.share+'</button>'+
+    '<span class="ig-save">'+(window.AevySaved?AevySaved.btn(s.id):'')+'</span></div>'+
+   '<div class="ig-likes"><b>'+nl.toLocaleString()+' like'+(nl===1?'':'s')+'</b></div>'+
+   '<p class="ig-cap"><b>'+esc((au.link&&(AevyAuth.byId(s.owner)||{}).username)||s.author||'user')+'</b> <strong>'+esc(s.title)+'</strong>'+(s.desc?' '+esc(s.desc):'')+'</p>'+
+   (tags?'<p class="ig-tags">'+tags+'</p>':'')+
    (window.AevyStats?AevyStats.cardStats(s):'')+
-   '<div class="post-acts">'+
-    '<button class="pact'+(liked?' on':'')+'" data-act="like" data-id="'+id+'" aria-pressed="'+!!liked+'">'+PI.like+'<span>Like</span></button>'+
-    '<button class="pact" data-act="cmt" data-id="'+id+'" aria-expanded="false">'+PI.cmt+'<span>Comment</span></button>'+
-    '<button class="pact" data-act="share" data-id="'+id+'">'+PI.share+'<span>Share</span></button>'+
-    (window.AevySaved?AevySaved.btn(s.id):'')+
-   '</div></article>';
+   '<button type="button" class="ig-viewc" data-act="cmt" data-id="'+id+'">'+(nc?'View all '+nc+' comments':'Add a comment...')+'</button>'+
+   '<time class="ig-time">'+esc(timeAgo(s.created)).toUpperCase()+' &middot; '+esc(fileNameOf(s))+' &middot; '+fmtSize(s.size||0)+'</time></article>';
 }
 function tileHTML(s){
   var id=esc(s.id),pv=String(s.preview||'').split('\n').slice(0,9).join('\n');
@@ -684,3 +694,8 @@ document.addEventListener('DOMContentLoaded',function(){
   });
 });
 })();
+
+document.addEventListener('dblclick',function(e){var m=e.target.closest('.ig-media');if(!m)return;
+  var b=document.querySelector('.ig-post .pact[data-act="like"][data-id="'+m.dataset.dbl+'"]');
+  if(b&&b.getAttribute('aria-pressed')!=='true')b.click();
+  m.classList.remove('pop');void m.offsetWidth;m.classList.add('pop');});

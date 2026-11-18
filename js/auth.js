@@ -14,8 +14,8 @@ var profiles=[],index={},user=null,me=null,silent=0,recovering=false,booted=fals
 var HOME=location.origin+location.pathname;
 
 function ms(t){var n=t?Date.parse(t):NaN;return isNaN(n)?Date.now():n}
-function pub(p){return {id:p.id,username:p.username,name:p.name,bio:p.bio||'',color:p.color,avatar:p.avatar||'',cover:p.cover||'',location:p.location||'',website:p.website||'',role:p.role==='admin'?'admin':'user',verified:!!p.verified,created:ms(p.created)}}
-var PCOLS='id,username,name,bio,color,avatar,cover,location,website,role,verified,created';
+function pub(p){return {id:p.id,username:p.username,name:p.name,bio:p.bio||'',color:p.color,avatar:p.avatar||'',cover:p.cover||'',location:p.location||'',website:p.website||'',role:p.role==='admin'?'admin':'user',verified:!!p.verified,guest:!!p.guest,created:ms(p.created)}}
+var PCOLS='id,username,name,bio,color,avatar,cover,location,website,role,verified,guest,created';
 function reindex(){index={};profiles.forEach(function(p){index[p.id]=p})}
 function hash(s){var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h)}
 function aevy(msg,extra){var e=new Error(msg);e.aevy=1;if(extra)for(var k in extra)e[k]=extra[k];return e}
@@ -49,7 +49,7 @@ var PBASE='id,username,name,bio,color,avatar,cover,location,website,created';
 function loadProfiles(){
   return sb.from('profiles').select(PCOLS).order('created',{ascending:true}).limit(1000).then(function(r){
     /* the badge columns (role, verified) are missing until the latest schema.sql is run: fall back so the site keeps working */
-    if(r.error&&(r.error.code==='42703'||/role|verified/i.test(r.error.message||''))){
+    if(r.error&&(r.error.code==='42703'||/role|verified|guest/i.test(r.error.message||''))){
       console.warn('Run the latest supabase/schema.sql to enable badges');
       return sb.from('profiles').select(PBASE).order('created',{ascending:true}).limit(1000);
     }
@@ -157,6 +157,18 @@ var A=window.AevyAuth={
       user=d.user;
       return ensureProfile().then(function(){setMe();return me});
     }).then(function(v){silent--;return v},function(e){silent--;throw nice(e)});
+  },
+  isGuest:function(){return !!(me&&me.guest)},
+  guest:function(){
+    silent++;
+    return sb.auth.signInAnonymously().then(must).then(function(d){
+      user=d.user;var n=0;
+      function tryp(){return loadProfiles().then(function(){setMe();if(me||++n>6)return me;return new Promise(function(r){setTimeout(r,500)}).then(tryp)})}
+      return tryp();
+    }).then(function(v){silent--;if(!v)throw new Error('Could not create the guest profile. Run the latest supabase/schema.sql in Supabase.');return v},function(e){
+      silent--;if(/anonymous/i.test((e&&e.message)||''))throw new Error('Guest accounts are not enabled yet. In Supabase open Authentication > Sign In / Providers and turn on "Allow anonymous sign-ins".');
+      throw nice(e);
+    });
   },
   signOut:function(){
     silent++;

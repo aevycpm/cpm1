@@ -83,7 +83,7 @@ and make sure scripts, script_comments, script_likes and daily_stats are enabled
 
 Badges and ranks (new)
 ----------------------
-- Blue Verified check   a user who has published 2 or more PUBLIC scripts gets it automatically (database triggers,
+- Blue Verified check   a user who has published 3 or more PUBLIC scripts (the Creator badge; only Creators appear in the Home feed) gets it automatically (database triggers,
                         so it cannot be faked from the browser). It is removed again if they drop below 2.
 - Admin rank            red "Admin" badge (Admins are always verified). Only you can grant it, in the Supabase SQL editor:
                             update public.profiles set role = 'admin' where username = 'your_username';
@@ -93,7 +93,7 @@ Badges and ranks (new)
                         To also give it real moderation rights run:  update public.profiles set role = 'admin' where username = 'aevy';
 - New badge             green "New" badge on accounts younger than 7 days. Older accounts show no badge.
 - Shown next to the name on script cards, profile pages, comments, the activity feed and the top-right user chip.
-- Settings (schema.sql): aevy_verify_scripts() = 2 scripts, aevy_new_user_days() = 7 days. If you change the days,
+- Settings (schema.sql): aevy_verify_scripts() = 3 posts, aevy_new_user_days() = 7 days. If you change the days,
   also change newDays in js/config.js so the site and the database agree.
 - Run the new supabase/schema.sql again: it adds profiles.role + profiles.verified, the triggers, the profile_badges
   view, the admin policies, and back-fills existing users.
@@ -196,4 +196,23 @@ Run the new supabase/schema.sql again: it adds script_saves and script_pins with
 Reports
 - Signed-in users see a Report button on other people's scripts and profiles. Re-run supabase/schema.sql once to create the
   reports table. Read reports in Supabase > Table Editor > reports (set status to reviewed/dismissed when done).
-- The blue Verified badge already exists: it is given automatically after 2 public scripts (Admins are always verified).
+- The blue Verified badge already exists: it is given automatically after 3 public scripts (Admins are always verified).
+
+Aevy AI chat (Gemini)
+---------------------
+The Gemini key must NEVER go into the website files. It lives in a Supabase Edge Function:
+  1. Create a NEW key in Google AI Studio (revoke any key you pasted anywhere public).
+  2. npm i -g supabase   then   supabase login   and   supabase link --project-ref jjtgwzyupfqfnbkntkep
+  3. supabase secrets set GEMINI_API_KEY=YOUR_NEW_KEY
+  4. supabase functions deploy ai-chat
+Optional: supabase secrets set GEMINI_MODEL=gemini-flash-latest   (default)
+Only signed-in users can call it (Supabase checks the login token).
+
+Guest accounts ("no account, no entry")
+---------------------------------------
+Visitors without an account are sent to the sign-in page and can tap "Continue as guest". A guest gets an
+automatic username (like calm_fox_482), name and a generated profile picture, and can ONLY message other guests.
+Likes, comments, follows, posts, scripts and the AI chat are blocked in the site and in the database.
+Setup: 1) run the latest supabase/schema.sql   2) Supabase > Authentication > Sign In / Providers >
+turn ON "Allow anonymous sign-ins"   3) paste the updated ai-chat function (it now refuses guests).
+Tidy up old guests now and then (SQL editor):  select public.purge_old_guests(30);

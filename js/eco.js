@@ -6,7 +6,16 @@ function $(s){return document.querySelector(s)}
 function mk(id,html){var s=document.createElement('section');s.className='view';s.id='view-'+id;s.dataset.view=id;s.innerHTML=html;$('main').appendChild(s);return s}
 function head(e,t,p){return '<div class="page-head"><div class="wrap"><p class="eyebrow">'+e+'</p><h1>'+t+'</h1>'+(p?'<p>'+p+'</p>':'')+'</div></div>'}
 function safeImg(u){return /^https:\/\//i.test(u||'')?u:''}
+function hsh(s){var h=2166136261;s=String(s);for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function genAv(u){
+  /* generated profile picture for guests: seeded gradient, sun and a friendly character (same name = same picture) */
+  var h=hsh(u.username||u.id),a=h%360,b=(a+50+(h>>>8)%110)%360,sx=14+(h>>>12)%36,sy=12+(h>>>16)%22,r=12+(h>>>20)%12,ears=(h>>>24)%3,
+      skin='hsl('+((b+20)%360)+',75%,90%)',inner='hsl('+a+',70%,45%)',g='g'+h;
+  var e=ears===1?'<circle cx="21" cy="19" r="5" fill="'+skin+'"/><circle cx="43" cy="19" r="5" fill="'+skin+'"/>':ears===2?'<path d="M21 26 20 12 29 20zM43 26 44 12 35 20z" fill="'+skin+'"/>':'';
+  return '<svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="'+g+'" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl('+a+',85%,62%)"/><stop offset="1" stop-color="hsl('+b+',85%,52%)"/></linearGradient></defs><rect width="64" height="64" fill="url(#'+g+')"/><circle cx="'+sx+'" cy="'+sy+'" r="'+r+'" fill="#fff" opacity=".22"/><path d="M10 66c1-14 11-20 22-20s21 6 22 20z" fill="'+skin+'"/>'+e+'<circle cx="32" cy="29" r="12" fill="'+skin+'"/><circle cx="27.5" cy="28" r="1.7" fill="'+inner+'"/><circle cx="36.5" cy="28" r="1.7" fill="'+inner+'"/><path d="M27.5 33.5q4.5 3.5 9 0" stroke="'+inner+'" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>';
+}
 function avatar(u,sz){
+  if(u.guest&&!safeImg(u.avatar))return '<span class="avatar has-img gen" data-uid="'+esc(u.id||'')+'" style="width:'+sz+'px;height:'+sz+'px">'+genAv(u)+'</span>';
   var st='--c:'+u.color+';width:'+sz+'px;height:'+sz+'px;font-size:'+Math.round(sz*.42)+'px',img=safeImg(u.avatar);
   if(img)return '<span class="avatar has-img" data-uid="'+esc(u.id||'')+'" style="'+st+'"><img src="'+esc(img)+'" alt="" loading="lazy" decoding="async"></span>';
   return '<span class="avatar" data-uid="'+esc(u.id||'')+'" style="'+st+'">'+esc((u.name||u.username).charAt(0).toUpperCase())+'</span>';

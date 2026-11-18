@@ -377,7 +377,7 @@ grant select on public.daily_stats to authenticated;
 
 -- =====================================================================================
 -- Badges and ranks: Verified (blue check), Admin rank, New-user badge
---   Verified  = the user has published 2 or more PUBLIC scripts (set automatically by triggers), or is an Admin.
+--   Creator (blue check) = the user has published 3 or more PUBLIC scripts (set automatically by triggers), or is an Admin.
 --   Admin     = profiles.role = 'admin'. Only you can grant it (SQL editor, see the bottom of this block).
 --   New       = account is younger than aevy_new_user_days() days. Older accounts get no badge.
 -- =====================================================================================
@@ -388,7 +388,7 @@ alter table public.profiles add constraint profiles_role_check check (role in ('
 create index if not exists profiles_role_idx on public.profiles (role) where role <> 'user';
 
 -- Settings you can change: how many public scripts earn the blue check, and how long the "New" badge lasts.
-create or replace function public.aevy_verify_scripts() returns int language sql immutable as $$ select 2 $$;
+create or replace function public.aevy_verify_scripts() returns int language sql immutable as $$ select 3 $$;
 create or replace function public.aevy_new_user_days()  returns int language sql immutable as $$ select 7 $$;
 
 -- true while the account is still "new" (used by the badge view below; the site uses the same rule)
@@ -813,3 +813,74 @@ create policy reports_insert on public.reports for insert to authenticated with 
 create policy reports_read   on public.reports for select to authenticated using (reporter = (select auth.uid()) or public.is_admin());
 create policy reports_admin  on public.reports for update to authenticated using (public.is_admin()) with check (public.is_admin());
 grant select, insert, update on public.reports to authenticated;
+
+
+-- =====================================================================================
+-- Guest accounts: "no account, no entry". A visitor taps "Continue as guest" and gets an anonymous
+-- Supabase account with an auto-generated username and name. Guests can ONLY message other guests:
+-- the database refuses their likes, comments, follows, posts and scripts (restrictive policies below).
+-- Dashboard: Authentication > Sign In / Providers > turn ON "Allow anonymous sign-ins".
+-- =====================================================================================
+alter table public.profiles add column if not exists guest boolean not null default false;
+
+create or replace function public.is_guest(uid uuid default auth.uid()) returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce((select guest from public.profiles where id = uid), false)
+$$;
+grant execute on function public.is_guest(uuid) to anon, authenticated;
+
+create or replace function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  un text := lower(coalesce(new.raw_user_meta_data->>'username', ''));
+  nm text := left(coalesce(nullif(btrim(new.raw_user_meta_data->>'name'), ''), un), 40);
+  adj  text[] := array['calm','brave','happy','swift','sunny','lucky','cosmic','misty','cool','bright','gentle','witty','royal','neon','wild','silent'];
+  noun text[] := array['fox','owl','panda','tiger','koala','falcon','otter','lynx','wolf','comet','river','cloud','maple','pixel','ember','orca'];
+  i int := 0;
+  cols text[] := array['#c8f53c','#5ec8ff','#ff9f5a','#c792ff','#ff6b8b','#4de0b0'];
+begin
+  if coalesce(new.is_anonymous, false) then
+    loop
+      un := adj[1 + floor(random() * array_length(adj, 1))::int] || '_' || noun[1 + floor(random() * array_length(noun, 1))::int] || '_' || (100 + floor(random() * 900))::int;
+      i := i + 1;
+      exit when i > 25 or not exists (select 1 from public.profiles where username = un);
+    end loop;
+    insert into public.profiles (id, username, name, color, guest)
+    values (new.id, un, initcap(replace(left(un, length(un) - 4), '_', ' ')), cols[1 + abs(hashtext(un)) % 6], true);
+    return new;
+  end if;
+  if un ~ '^[a-z0-9_]{3,20}$' then
+    insert into public.profiles (id, username, name, color)
+    values (new.id, un, nm, cols[1 + abs(hashtext(un)) % 6]);
+  end if;
+  return new;
+end $$;
+
+-- Guests cannot create anything public (restrictive policies are ANDed with the normal ones).
+do $$
+declare t text;
+begin
+  foreach t in array array['scripts','script_files','script_likes','script_comments','follows','posts','post_likes','post_comments'] loop
+    if to_regclass('public.' || t) is not null then
+      execute format('drop policy if exists guest_block on public.%I', t);
+      execute format('create policy guest_block on public.%I as restrictive for insert to authenticated with check (not public.is_guest())', t);
+    end if;
+  end loop;
+end $$;
+
+-- Guests can message only other guests.
+drop policy if exists guest_msg on public.messages;
+create policy guest_msg on public.messages as restrictive for insert to authenticated
+  with check (not public.is_guest() or public.is_guest(recipient));
+
+-- Optional cleanup: delete guest accounts not used for N days (run by hand, or schedule with pg_cron).
+create or replace function public.purge_old_guests(days int default 30) returns int
+language plpgsql security definer set search_path = public, auth as $$
+declare n int;
+begin
+  with d as (delete from auth.users u using public.profiles p
+             where p.id = u.id and p.guest and coalesce(u.last_sign_in_at, u.created_at) < now() - make_interval(days => days) returning 1)
+  select count(*) into n from d;
+  return n;
+end $$;
+revoke all on function public.purge_old_guests(int) from public, anon, authenticated;

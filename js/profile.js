@@ -51,7 +51,7 @@ function aboutCard(u,own){
   if(w&&w.isAdmin(u))b='<span class="rbadge admin">Admin</span> ';
   var pres='';
   return '<div class="hs-card pp-about"><h3>About</h3>'+(u.bio?'<p class="pp-bio">'+esc(u.bio)+'</p>':'<p class="pp-bio muted-p">'+(own?'Add a short bio so people know who you are.':'No bio yet.')+'</p>')+'<ul class="pp-meta">'+meta+'</ul>'+
-    (w&&(w.isVerified(u)||w.isAdmin(u))?'<p class="pp-ver">'+(window.AevyBadge?AevyBadge.html(u):'')+'<span>'+(w.isAdmin(u)?'Aevy administrator':'Verified creator')+'</span></p>':'')+'</div>'+(own?completeCard(u):'');
+    (w&&(w.isVerified(u)||w.isAdmin(u))?'<p class="pp-ver">'+(window.AevyBadge?AevyBadge.html(u):'')+'<span>'+(w.isAdmin(u)?'Aevy administrator':'Creator')+'</span></p>':'')+'</div>'+(own?completeCard(u):'');
 }
 function completeCard(u){
   var steps=[['Profile photo',!!safeImg(u.avatar),'data-img="avatar"'],['Cover photo',!!safeImg(u.cover),'data-img="cover"'],['Bio',!!u.bio,'data-pp="edit"'],['Location',!!u.location,'data-pp="edit"'],['Website',!!u.website,'data-pp="edit"']];
@@ -102,10 +102,23 @@ function aboutPane(){
 }
 function settingsPane(){
   var vis=window.AevySocial&&AevySocial.visible?AevySocial.visible():true;
-  return '<div class="pp-settings">'+
-   '<div class="hs-card"><h3>Account</h3><p class="muted-p">Signed in as '+esc(A.email())+'</p>'+
-   '<label class="pp-switch"><input type="checkbox" id="ppVis"'+(vis?' checked':'')+'><span>Show my online status<small>When off, nobody sees if you are online or when you were last seen.</small></span></label></div>'+
-   '<form class="hs-card form" id="pw"><h3>Change password</h3><input class="field" id="pOld" type="password" placeholder="Current password" autocomplete="current-password" required><input class="field" id="pNew" type="password" placeholder="New password (8+ characters)" autocomplete="new-password" required><p class="ferr" role="alert"></p><div><button class="btn">Update password</button></div></form>'+
+  var priv=false;try{priv=localStorage.getItem('aevy_priv')==='1'}catch(e){}
+  var dark=document.documentElement.dataset.theme==='dark';
+  function row(t,sub,ctl){return '<div class="ig-row"><span><b>'+t+'</b>'+(sub?'<small>'+sub+'</small>':'')+'</span>'+ctl+'</div>'}
+  function sw(id,on){return '<label class="ig-sw"><input type="checkbox" id="'+id+'"'+(on?' checked':'')+'><i></i></label>'}
+  return '<div class="pp-settings ig-settings">'+
+   '<h4>Your account</h4><div class="ig-group">'+
+    row('Edit profile','Name, bio, photo, links','<button class="btn btn-sm" id="igEdit" type="button">Edit</button>')+
+    row('Email',esc(A.email()),'')+'</div>'+
+   '<h4>Who can see your content</h4><div class="ig-group">'+
+    row('Private account','Only approved followers can see your posts',sw('igPriv',priv))+
+    row('Activity status','Show when you are online',sw('ppVis',vis))+'</div>'+
+   '<h4>How you use Aevy</h4><div class="ig-group">'+
+    row('Dark mode','',sw('igDark',dark))+
+    row('Notifications','Message and like alerts',sw('igNotif',(window.Notification&&Notification.permission==='granted')))+'</div>'+
+   '<h4>Login and security</h4><form class="ig-group form" id="pw"><div class="ig-row col"><b>Change password</b><input class="field" id="pOld" type="password" placeholder="Current password" autocomplete="current-password" required><input class="field" id="pNew" type="password" placeholder="New password (8+ characters)" autocomplete="new-password" required><p class="ferr" role="alert"></p><button class="btn btn-primary btn-sm">Update password</button></div></form>'+
+   '<h4>More info and support</h4><div class="ig-group"><a class="ig-row" href="#/privacy"><b>Privacy and data</b><span>&rsaquo;</span></a><a class="ig-row" href="#/terms"><b>Terms</b><span>&rsaquo;</span></a></div>'+
+   '<div class="ig-group"><button class="ig-row ig-link" id="igOut" type="button"><b>Log out</b></button></div>'+
    '<div class="danger-zone"><h3>Delete account</h3><p>Permanently removes your account, profile, photos, every script you published and all their files.</p><form id="del"><input class="field" id="dPw" type="password" placeholder="Confirm password" required><button class="btn btn-danger">Delete account</button></form><p class="ferr" id="dErr" role="alert"></p></div></div>';
 }
 function paintPane(){
@@ -124,6 +137,11 @@ function wireScripts(){
   if(c)c.onclick=function(){var b=this;b.disabled=true;b.textContent='Uploading...';C.importLocal().then(function(n){C.toast(n+' script(s) uploaded');window.dispatchEvent(new Event('aevy:auth'))},function(x){b.disabled=false;C.toast(x.message)})};
 }
 function wireSettings(){
+  var e1=$('#igEdit');if(e1)e1.onclick=openEdit;
+  var pv=$('#igPriv');if(pv)pv.onchange=function(){try{localStorage.setItem('aevy_priv',this.checked?'1':'0')}catch(x){}C.toast(this.checked?'Account set to private (display only)':'Account is public')};
+  var dk=$('#igDark');if(dk)dk.onchange=function(){var t=document.getElementById('theme');if(t)t.click()};
+  var nf=$('#igNotif');if(nf)nf.onchange=function(){var b=this;if(b.checked&&window.Notification)Notification.requestPermission().then(function(r){b.checked=r==='granted'})};
+  var lo=$('#igOut');if(lo)lo.onclick=function(){var f=A.signOut||A.logout||A.out;if(f)Promise.resolve(f.call(A)).then(function(){location.hash='#/'});else C.toast('Use the account menu to sign out')};
   var v=$('#ppVis');if(v)v.onchange=function(){if(window.AevySocial&&AevySocial.setVisible)AevySocial.setVisible(this.checked);C.toast(this.checked?'Online status is visible':'Online status is hidden')};
   var m=ctx.u;
   $('#pw').onsubmit=function(e){e.preventDefault();var b=this.querySelector('.ferr'),f=this;b.textContent='';A.changePassword($('#pOld').value,$('#pNew').value).then(function(){f.reset();C.toast('Password changed')},function(x){b.textContent=x.message||String(x)})};
