@@ -123,6 +123,7 @@ document.addEventListener('click',function(e){
 /* Header icon + popup inbox, pop-up chat windows (dock), full Messages page, live typing, read receipts. */
 function ico(p,s){return '<svg width="'+(s||18)+'" height="'+(s||18)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+p+'</svg>'}
 var P={
+  plane:'<path d="M21 3 10.5 13.5"/><path d="M21 3l-6.5 18-4-7.5L3 9.5z"/>',
   chat:'<path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 20.5l1.4-5.4A8.5 8.5 0 1 1 21 11.5z"/>',
   send:'<path d="M22 2 11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/>',
   close:'<path d="M6 6l12 12M18 6 6 18"/>',
@@ -230,7 +231,7 @@ function tabsHTML(cur,n){
 var hb=document.createElement('button');
 hb.type='button';hb.className='icon-btn mbtn';hb.id='msgBtn';hb.hidden=true;
 hb.setAttribute('aria-label','Messages');hb.setAttribute('aria-haspopup','dialog');hb.setAttribute('aria-expanded','false');
-hb.innerHTML=ico(P.chat,20)+'<i class="mdot" id="msgDot" hidden></i>';
+hb.innerHTML=ico(P.plane,22)+'<i class="mdot" id="msgDot" hidden></i>';
 var bar=$('.bar-actions');if(bar)bar.insertBefore(hb,$('#theme')||bar.firstChild);
 var pop=document.createElement('div');pop.className='mp';pop.id='msgPop';pop.hidden=true;pop.setAttribute('role','dialog');pop.setAttribute('aria-label','Messages');
 pop.innerHTML='<div class="mp-head"><h3>Messages</h3><span class="mp-tools"><button type="button" class="cw-ibtn" data-mp="new" title="New message" aria-label="New message">'+ico(P.edit,17)+'</button><a class="cw-ibtn" href="#/messages" title="Open Messages" aria-label="Open Messages">'+ico(P.full,17)+'</a></span></div>'+
@@ -249,7 +250,7 @@ function paintPop(){
   $('#mpTabs').innerHTML=tabsHTML(popTab,convos().filter(function(c){return c.n}).length);
   $('#mpList').innerHTML=listHTML($('#mpFind').value,popTab,null);paint();
 }
-hb.onclick=function(e){e.stopPropagation();popOpen()?closePop():openPop()};
+hb.onclick=function(e){e.stopPropagation();if(mobile()){closePop();location.hash='#/messages';return}popOpen()?closePop():openPop()};
 $('#mpFind').oninput=paintPop;
 pop.addEventListener('click',function(e){
   e.stopPropagation();
@@ -474,7 +475,7 @@ function notify(u,m){
 
 /* ---------- Messages page ---------- */
 var sec=document.createElement('section');sec.className='view';sec.id='view-messages';sec.dataset.view='messages';
-sec.innerHTML='<div class="wrap"><div class="mx" id="msgs"><aside class="mx-side"><div class="mx-sh"><h1>Messages</h1><button type="button" class="cw-ibtn" id="mNew" title="New message" aria-label="New message">'+ico(P.edit,18)+'</button></div>'+
+sec.innerHTML='<div class="wrap"><div class="mx" id="msgs"><aside class="mx-side"><div class="mx-sh"><button type="button" class="cw-ibtn mx-back" id="mBack" aria-label="Back">'+ico(P.back,24)+'</button><h1>Messages</h1><button type="button" class="cw-ibtn" id="mNew" title="New message" aria-label="New message">'+ico(P.edit,18)+'</button></div>'+
  '<div class="mp-search">'+ico(P.search,16)+'<input id="mFind" type="search" placeholder="Search people" autocomplete="off" aria-label="Search people"></div>'+
  '<div class="mp-tabs" id="mTabs" role="tablist"></div><ul class="mx-list" id="mList"></ul>'+
  '<label class="mx-opt"><span><b>Show when I am online</b><small>Others can see your active status</small></span><input type="checkbox" id="mStatus" class="sw"></label></aside>'+
@@ -482,6 +483,7 @@ sec.innerHTML='<div class="wrap"><div class="mx" id="msgs"><aside class="mx-side
 $('main').appendChild(sec);
 $('#mStatus').onchange=function(){try{localStorage.setItem(HIDE_KEY,this.checked?'0':'1')}catch(e){}beat()};
 $('#mNew').onclick=function(){$('#mFind').focus()};
+$('#mBack').onclick=function(){if(history.length>1&&document.referrer.indexOf(location.host)>-1)history.back();else location.hash='#/'};
 function paintList(){
   if(!me()||!sec.classList.contains('active'))return;
   $('#mTabs').innerHTML=tabsHTML(pageTab,convos().filter(function(c){return c.n}).length);
